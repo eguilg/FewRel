@@ -283,4 +283,7 @@ class RobertaPAIRSentenceEncoder(nn.Module):
         for i in range(0, 4):
             sst.insert(ins[i][0] + i, ins[i][1])
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(sst)
-        return indexed_tokens 
+        return indexed_tokens
+
+
+

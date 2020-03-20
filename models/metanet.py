@@ -79,7 +79,7 @@ class LearnerForBasic(nn.Module):
 
 class MetaNet(fewshot_re_kit.framework.FewShotREModel):
     
-    def __init__(self, N, K, embedding, max_length, hidden_size=230):
+    def __init__(self, embedding, N, max_length, hidden_size=230):
         '''
         N: num of classes
         K: num of instances for each class
@@ -89,7 +89,6 @@ class MetaNet(fewshot_re_kit.framework.FewShotREModel):
         self.max_length = max_length
         self.hidden_size = hidden_size
         self.N = N
-        self.K = K
         
         # self.embedding = Embedding(word_vec_mat, max_length, word_embedding_dim=50, pos_embedding_dim=5)
         self.embedding = embedding
@@ -117,8 +116,8 @@ class MetaNet(fewshot_re_kit.framework.FewShotREModel):
         return output.view(size)
     
     def attention_emb(self, inputs, size, use_fast=False):
-        x = self.embedding(inputs)
-        output = self.attention_encoder(x)
+        x = self.embedding(inputs)  # b, len, h
+        output = self.attention_encoder(x)  # b, h
         if use_fast:
             output += F.relu(F.conv1d(x.transpose(-1, -2), self.attention_fast_conv_W, padding=1)).max(-1)[0]
         return output.view(size)
@@ -135,7 +134,7 @@ class MetaNet(fewshot_re_kit.framework.FewShotREModel):
         score = F.softmax(cos, -1) # (B, NQ, N * K)
         return score
 
-    def forward(self, support, query, N, K, Q):
+    def forward(self, support, query, N, K, NQ):
         '''
         support: Inputs of the support set.
         query: Inputs of the query set.
@@ -149,7 +148,7 @@ class MetaNet(fewshot_re_kit.framework.FewShotREModel):
         logits = self.attention_fc(s) # (B, N, K, N)
 
         B = s.size(0)
-        NQ = N * Q
+        # NQ = N * Q
         assert(B == 1)
 
         self.zero_grad()
@@ -188,7 +187,7 @@ class MetaNet(fewshot_re_kit.framework.FewShotREModel):
         self.zero_grad()
         s_att = self.attention_emb(support, (-1, N, K, self.hidden_size), use_fast=True)
         q_att = self.attention_emb(query, (-1, NQ, self.hidden_size), use_fast=True)
-        score = self.attention_score(s_att, q_att).squeeze(0) # assume B = 1, (NQ, N * K)
+        score = self.attention_score(s_att, q_att).squeeze(0)  # assume B = 1, (NQ, N * K)
         size_conv_param = basic_fast_conv_params.size()[1:]
         size_fc_param = basic_fast_fc_params.size()[1:]
         final_fast_conv_param = torch.matmul(score, basic_fast_conv_params.view(N * K, -1)) # (NQ, conv_weight_size)

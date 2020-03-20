@@ -4,6 +4,7 @@ from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEnco
 import models
 from models.proto import Proto
 from models.gnn import GNN
+from models.wgnn import WGNN
 from models.snail import SNAIL
 from models.metanet import MetaNet
 from models.siamese import Siamese
@@ -131,15 +132,15 @@ def main():
                 N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, encoder_name=encoder_name)
         val_data_loader = get_loader_pair(opt.val, sentence_encoder,
                 N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, encoder_name=encoder_name)
-        test_data_loader = get_loader_pair(opt.test, sentence_encoder,
-                N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, encoder_name=encoder_name)
+        # test_data_loader = get_loader_pair(opt.test, sentence_encoder,
+        #         N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size, encoder_name=encoder_name)
     else:
         train_data_loader = get_loader(opt.train, sentence_encoder,
                 N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
         val_data_loader = get_loader(opt.val, sentence_encoder,
                 N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
-        test_data_loader = get_loader(opt.test, sentence_encoder,
-                N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
+        # test_data_loader = get_loader(opt.test, sentence_encoder,
+        #         N=N, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
         if opt.adv:
            adv_data_loader = get_loader_unsupervised(opt.adv, sentence_encoder,
                 N=trainN, K=K, Q=Q, na_rate=opt.na_rate, batch_size=batch_size)
@@ -155,9 +156,9 @@ def main():
         raise NotImplementedError
     if opt.adv:
         d = Discriminator(opt.hidden_size)
-        framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader, adv_data_loader, adv=opt.adv, d=d)
+        framework = FewShotREFramework(train_data_loader, val_data_loader, None, adv_data_loader, adv=opt.adv, d=d)
     else:
-        framework = FewShotREFramework(train_data_loader, val_data_loader, test_data_loader)
+        framework = FewShotREFramework(train_data_loader, val_data_loader, None)
         
     prefix = '-'.join([model_name, encoder_name, opt.train, opt.val, str(N), str(K)])
     if opt.adv is not None:
@@ -169,11 +170,13 @@ def main():
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'gnn':
         model = GNN(sentence_encoder, N)
+    elif model_name == 'metawgnn':
+        model = WGNN(sentence_encoder, N, na_rate=opt.na_rate)
     elif model_name == 'snail':
         print("HINT: SNAIL works only in PyTorch 0.3.1")
         model = SNAIL(sentence_encoder, N, K)
     elif model_name == 'metanet':
-        model = MetaNet(N, K, sentence_encoder.embedding, max_length)
+        model = MetaNet(sentence_encoder.embedding, N, max_length)
     elif model_name == 'siamese':
         model = Siamese(sentence_encoder, hidden_size=opt.hidden_size, dropout=opt.dropout)
     elif model_name == 'pair':
@@ -203,8 +206,8 @@ def main():
     else:
         ckpt = opt.load_ckpt
 
-    acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, pair=opt.pair)
-    print("RESULT: %.2f" % (acc * 100))
+    # acc = framework.eval(model, batch_size, N, K, Q, opt.test_iter, na_rate=opt.na_rate, ckpt=ckpt, pair=opt.pair)
+    # print("RESULT: %.2f" % (acc * 100))
 
 if __name__ == "__main__":
     main()

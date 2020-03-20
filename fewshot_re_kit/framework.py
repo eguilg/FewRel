@@ -26,7 +26,8 @@ class FewShotREModel(nn.Module):
         You need to set self.cost as your own loss function.
         '''
         nn.Module.__init__(self)
-        self.sentence_encoder = nn.DataParallel(sentence_encoder)
+        # self.sentence_encoder = nn.DataParallel(sentence_encoder)
+        self.sentence_encoder = sentence_encoder
         self.cost = nn.CrossEntropyLoss()
     
     def forward(self, support, query, N, K, Q):
@@ -224,6 +225,7 @@ class FewShotREFramework:
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+
             
             # Adv part
             if self.adv:
@@ -317,7 +319,7 @@ class FewShotREFramework:
                 if name not in own_state:
                     continue
                 own_state[name].copy_(param)
-            eval_dataset = self.test_data_loader
+            eval_dataset = self.val_data_loader
 
         iter_right = 0.0
         iter_sample = 0.0

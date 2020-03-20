@@ -17,7 +17,7 @@ if torch.cuda.is_available():
     dtype_l = torch.cuda.LongTensor
 else:
     dtype = torch.FloatTensor
-    dtype_l = torch.cuda.LongTensor
+    dtype_l = torch.LongTensor
 
 
 def gmul(input):
@@ -84,6 +84,8 @@ class Wcompute(nn.Module):
         self.activation = activation
 
     def forward(self, x, W_id):
+        # x: (B* NQ, 1+N*K, D+N)
+        # W_id : (B* NQ, 1+N*K, 1+N*k, 1) 邻接矩阵
         W1 = x.unsqueeze(2)
         W2 = torch.transpose(W1, 1, 2) #size: bs x N x N x num_features
         W_new = torch.abs(W1 - W2) #size: bs x N x N x num_features
@@ -163,9 +165,10 @@ class GNN_nl_omniglot(nn.Module):
         self.layer_last = Gconv(self.input_features + int(self.nf / 2) * self.num_layers, args.train_N_way, 2, bn_bool=True)
 
     def forward(self, x):
+        # x: (B* NQ, 1+N*K, D+N)
         W_init = Variable(torch.eye(x.size(1)).unsqueeze(0).repeat(x.size(0), 1, 1).unsqueeze(3))
         if self.args.cuda:
-            W_init = W_init.cuda()
+            W_init = W_init.cuda()  # W_init : (B* NQ, 1+N*K, 1+N*k, 1) 邻接矩阵
 
         for i in range(self.num_layers):
             Wi = self._modules['layer_w{}'.format(i)](x, W_init)
@@ -183,9 +186,9 @@ class GNN_nl(nn.Module):
     def __init__(self, N, input_features, nf, J):
         super(GNN_nl, self).__init__()
         # self.args = args
-        self.input_features = input_features
-        self.nf = nf
-        self.J = J
+        self.input_features = input_features  # 230 + N
+        self.nf = nf  # 96
+        self.J = J  # 1
 
         self.num_layers = 2
 
@@ -204,7 +207,7 @@ class GNN_nl(nn.Module):
 
     def forward(self, x):
         W_init = Variable(torch.eye(x.size(1)).unsqueeze(0).repeat(x.size(0), 1, 1).unsqueeze(3))
-        W_init = W_init.cuda()
+        W_init = W_init.cuda()  # B* NQ, 1+N*K, 1+N*k, 1 邻接矩阵
 
         for i in range(self.num_layers):
             Wi = self._modules['layer_w{}'.format(i)](x, W_init)
