@@ -323,30 +323,30 @@ class FewShotREFramework:
 
         iter_right = 0.0
         iter_sample = 0.0
-        with torch.no_grad():
-            for it in range(eval_iter):
-                if pair:
-                    batch, label = next(eval_dataset)
-                    if torch.cuda.is_available():
-                        for k in batch:
-                            batch[k] = batch[k].cuda()
-                        label = label.cuda()
-                    logits, pred = model(batch, N, K, Q * N + Q * na_rate)
-                else:
-                    support, query, label = next(eval_dataset)
-                    if torch.cuda.is_available():
-                        for k in support:
-                            support[k] = support[k].cuda()
-                        for k in query:
-                            query[k] = query[k].cuda()
-                        label = label.cuda()
-                    logits, pred = model(support, query, N, K, Q * N + Q * na_rate)
+        # with torch.no_grad():
+        for it in range(eval_iter):
+            if pair:
+                batch, label = next(eval_dataset)
+                if torch.cuda.is_available():
+                    for k in batch:
+                        batch[k] = batch[k].cuda()
+                    label = label.cuda()
+                logits, pred = model(batch, N, K, Q * N + Q * na_rate)
+            else:
+                support, query, label = next(eval_dataset)
+                if torch.cuda.is_available():
+                    for k in support:
+                        support[k] = support[k].cuda()
+                    for k in query:
+                        query[k] = query[k].cuda()
+                    label = label.cuda()
+                logits, pred = model(support, query, N, K, Q * N + Q * na_rate)
 
-                right = model.accuracy(pred, label)
-                iter_right += self.item(right.data)
-                iter_sample += 1
+            right = model.accuracy(pred, label)
+            iter_right += self.item(right.data)
+            iter_sample += 1
 
-                sys.stdout.write('[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) +'\r')
-                sys.stdout.flush()
-            print("")
+            sys.stdout.write('[EVAL] step: {0:4} | accuracy: {1:3.2f}%'.format(it + 1, 100 * iter_right / iter_sample) +'\r')
+            sys.stdout.flush()
+        print("")
         return iter_right / iter_sample

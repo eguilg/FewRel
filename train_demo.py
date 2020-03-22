@@ -1,10 +1,11 @@
 from fewshot_re_kit.data_loader import get_loader, get_loader_pair, get_loader_unsupervised
 from fewshot_re_kit.framework import FewShotREFramework
-from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder
+from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder, DummySentenceEncoder
 import models
 from models.proto import Proto
 from models.gnn import GNN
-from models.wgnn import WGNN
+from models.wgnn import WGNN, MetaWGNN
+from models.gog import GOG
 from models.snail import SNAIL
 from models.metanet import MetaNet
 from models.siamese import Siamese
@@ -94,13 +95,17 @@ def main():
     print("encoder: {}".format(encoder_name))
     print("max_length: {}".format(max_length))
     
-    if encoder_name == 'cnn':
+    if encoder_name in ['cnn', 'rnn', 'dummy']:
         try:
             glove_mat = np.load('./pretrain/glove/glove_mat.npy')
             glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
         except:
             raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
-        sentence_encoder = CNNSentenceEncoder(
+        if encoder_name == 'cnn':
+            encoder_class = CNNSentenceEncoder
+        else:
+            encoder_class = DummySentenceEncoder
+        sentence_encoder = encoder_class(
                 glove_mat,
                 glove_word2id,
                 max_length)
@@ -170,8 +175,12 @@ def main():
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'gnn':
         model = GNN(sentence_encoder, N)
-    elif model_name == 'metawgnn':
+    elif model_name == 'wgnn':
         model = WGNN(sentence_encoder, N, na_rate=opt.na_rate)
+    elif model_name == 'metawgnn':
+        model = MetaWGNN(sentence_encoder, N, na_rate=opt.na_rate)
+    elif model_name == 'gog':
+        model = GOG(sentence_encoder, N)
     elif model_name == 'snail':
         print("HINT: SNAIL works only in PyTorch 0.3.1")
         model = SNAIL(sentence_encoder, N, K)

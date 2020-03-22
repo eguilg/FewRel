@@ -21,9 +21,9 @@ class CNNSentenceEncoder(nn.Module):
                 pos_embedding_dim, hidden_size)
         self.word2id = word2id
 
-    def forward(self, inputs):
+    def forward(self, inputs, pool=True):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, pool=pool)
         return x
 
     def tokenize(self, raw_tokens, pos_head, pos_tail):
@@ -286,4 +286,94 @@ class RobertaPAIRSentenceEncoder(nn.Module):
         return indexed_tokens
 
 
+class DummySentenceEncoder(nn.Module):
 
+    def __init__(self, word_vec_mat, word2id, max_length, word_embedding_dim=50,
+                 pos_embedding_dim=5, hidden_size=230):
+        nn.Module.__init__(self)
+        self.hidden_size = hidden_size
+        self.max_length = max_length
+        self.word_embedding_dim = word_embedding_dim
+        self.pos_embedding_dim = pos_embedding_dim
+        word_vec_mat = torch.from_numpy(word_vec_mat)
+        self.word_embedding = nn.Embedding(word_vec_mat.shape[0]+4, self.word_embedding_dim,
+                                           padding_idx=word_vec_mat.shape[0] - 1)
+        self.word_embedding.weight.data[:word_vec_mat.shape[0]].copy_(word_vec_mat)
+
+        self.pos_embedding = nn.Embedding(max_length, pos_embedding_dim)
+        self.rnn = nn.GRU(word_embedding_dim+pos_embedding_dim,
+                          hidden_size//2,
+                          bidirectional=True,
+                          batch_first=True,
+                          num_layers=1)
+        self.word2id = word2id
+        origin_len = len(self.word2id)
+        self.word2id['[e1]'] = origin_len
+        self.word2id['[/e1]'] = origin_len + 1
+        self.word2id['[e2]'] = origin_len + 2
+        self.word2id['[/e2]'] = origin_len + 3
+
+    def forward(self, inputs, pool=True):
+        word = inputs['word']
+        lengths = inputs['mask'].sum(-1)
+        seq_length = word.shape[1]
+        device = word.device
+        position_ids = torch.arange(seq_length, dtype=torch.long, device=device)
+        position_ids = position_ids.unsqueeze(0).expand(word.shape)
+        x = torch.cat([self.word_embedding(word),
+                       self.pos_embedding(position_ids)], 2)
+
+        x = torch.nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
+        x = self.rnn(x)[0]
+        x = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True, total_length=self.max_length)[0]
+        if pool:
+            x = x.max(dim=1)[0]
+        return x
+
+    def tokenize(self, raw_tokens, pos_head, pos_tail):
+        # token -> index
+        tokens = []
+        cur_pos = 0
+        pos1_in_index = 0
+        pos2_in_index = 0
+        for token in raw_tokens:
+            token = token.lower()
+            if cur_pos == pos_head[0]:
+                tokens.append('[e1]')
+                pos1_in_index = len(tokens)
+            if cur_pos == pos_tail[0]:
+                tokens.append('[e2]')
+                pos2_in_index = len(tokens)
+
+            tokens.append(token)
+
+            if cur_pos == pos_head[-1]:
+                tokens.append('[/e1]')
+            if cur_pos == pos_tail[-1]:
+                tokens.append('[/e2]')
+            cur_pos += 1
+
+        indexed_tokens = []
+        for token in tokens:
+            token = token.lower()
+            if token in self.word2id:
+                indexed_tokens.append(self.word2id[token])
+            else:
+                indexed_tokens.append(self.word2id['[UNK]'])
+        # padding
+        while len(indexed_tokens) < self.max_length:
+            indexed_tokens.append(self.word2id['[PAD]'])
+        indexed_tokens = indexed_tokens[:self.max_length]
+
+        # pos
+        pos1 = np.zeros((self.max_length), dtype=np.int32)
+        pos2 = np.zeros((self.max_length), dtype=np.int32)
+        for i in range(self.max_length):
+            pos1[i] = i - pos1_in_index + self.max_length
+            pos2[i] = i - pos2_in_index + self.max_length
+
+        # mask
+        mask = np.zeros((self.max_length), dtype=np.int32)
+        mask[:len(tokens)] = 1
+
+        return indexed_tokens, pos1, pos2, mask

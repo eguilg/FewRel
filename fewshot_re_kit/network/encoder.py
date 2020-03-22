@@ -21,8 +21,15 @@ class Encoder(nn.Module):
         self.mask_embedding.weight.requires_grad = False
         self._minus = -100
 
-    def forward(self, inputs):
-        return self.cnn(inputs)
+    def forward(self, inputs, pool=True):
+        x = self.conv(inputs.transpose(1, 2))
+        if pool:
+            x = F.relu(x)
+            x = self.pool(x).squeeze(2)
+        else:
+            x = F.leaky_relu(x)
+            x = x.transpose(1, 2)
+        return x
 
     def cnn(self, inputs):
         x = self.conv(inputs.transpose(1, 2))
