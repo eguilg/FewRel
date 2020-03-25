@@ -35,7 +35,7 @@ class CNNSentenceEncoder(nn.Module):
                 indexed_tokens.append(self.word2id[token])
             else:
                 indexed_tokens.append(self.word2id['[UNK]'])
-        
+        valid_len = len(indexed_tokens)
         # padding
         while len(indexed_tokens) < self.max_length:
             indexed_tokens.append(self.word2id['[PAD]'])
@@ -52,7 +52,7 @@ class CNNSentenceEncoder(nn.Module):
 
         # mask
         mask = np.zeros((self.max_length), dtype=np.int32)
-        mask[:len(indexed_tokens)] = 1
+        mask[:valid_len] = 1
 
         return indexed_tokens, pos1, pos2, mask
 

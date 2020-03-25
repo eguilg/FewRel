@@ -87,16 +87,16 @@ class SelfOutput(nn.Module):
 		super().__init__()
 		self.in_dim = in_dim
 		self.out_dim = out_dim
-		self.dense = nn.Linear(in_dim, in_dim)
-		self.LayerNorm = nn.LayerNorm(in_dim, eps=1e-12)
+		# self.dense = nn.Linear(in_dim, in_dim)
+		# self.LayerNorm = nn.LayerNorm(in_dim, eps=1e-12)
 		self.dropout = nn.Dropout(dropout)
 		if out_dim != in_dim:
 			self.dense2 = nn.Linear(in_dim, out_dim)
 
 	def forward(self, hidden_states, input_tensor):
-		hidden_states = self.dense(hidden_states)
-		hidden_states = self.dropout(hidden_states)
-		hidden_states = self.LayerNorm(hidden_states + input_tensor)
+		# hidden_states = self.dense(hidden_states)
+		# hidden_states = self.dropout(hidden_states)
+		# hidden_states = self.LayerNorm(hidden_states + input_tensor)
 		if self.out_dim != self.in_dim:
 			hidden_states = self.dense2(F.leaky_relu(hidden_states))
 		return hidden_states
@@ -111,6 +111,7 @@ class AtentionLayer(nn.Module):
 	def forward(self, hidden_states):
 		self_outputs = self.self(hidden_states)
 		attention_output = self.output(self_outputs[0], hidden_states)
+		# attention_output = self_outputs[0]
 		outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
 		return outputs
 

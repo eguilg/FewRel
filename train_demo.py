@@ -3,6 +3,8 @@ from fewshot_re_kit.framework import FewShotREFramework
 from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder, DummySentenceEncoder
 import models
 from models.proto import Proto
+from models.proto_hatt import ProtoHATT
+from models.mlan import MLAN
 from models.gnn import GNN
 from models.wgnn import WGNN, MetaWGNN
 from models.gog import GOG
@@ -173,6 +175,10 @@ def main():
     
     if model_name == 'proto':
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
+    elif model_name == 'mlan':
+        model = MLAN(sentence_encoder, hidden_size=opt.hidden_size, shots=K)
+    elif model_name == 'hatt':
+        model = ProtoHATT(sentence_encoder, hidden_size=opt.hidden_size, shots=K)
     elif model_name == 'gnn':
         model = GNN(sentence_encoder, N)
     elif model_name == 'wgnn':

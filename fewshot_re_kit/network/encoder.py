@@ -23,11 +23,10 @@ class Encoder(nn.Module):
 
     def forward(self, inputs, pool=True):
         x = self.conv(inputs.transpose(1, 2))
+        x = F.relu(x)
         if pool:
-            x = F.relu(x)
             x = self.pool(x).squeeze(2)
         else:
-            x = F.leaky_relu(x)
             x = x.transpose(1, 2)
         return x
 

@@ -218,6 +218,7 @@ class FewShotREFramework:
                     scaled_loss.backward()
                 # torch.nn.utils.clip_grad_norm_(amp.master_params(optimizer), 10)
             else:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), 4)
                 loss.backward()
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
             
