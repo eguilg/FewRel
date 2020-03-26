@@ -1,6 +1,6 @@
 from fewshot_re_kit.data_loader import get_loader, get_loader_pair, get_loader_unsupervised
 from fewshot_re_kit.framework import FewShotREFramework
-from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder, DummySentenceEncoder
+from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder, DummySentenceEncoder, ATTNSentenceEncoder
 import models
 from models.proto import Proto
 from models.proto_hatt import ProtoHATT
@@ -97,7 +97,7 @@ def main():
     print("encoder: {}".format(encoder_name))
     print("max_length: {}".format(max_length))
     
-    if encoder_name in ['cnn', 'rnn', 'dummy']:
+    if encoder_name in ['cnn', 'rnn', 'dummy', 'attn']:
         try:
             glove_mat = np.load('./pretrain/glove/glove_mat.npy')
             glove_word2id = json.load(open('./pretrain/glove/glove_word2id.json'))
@@ -105,8 +105,11 @@ def main():
             raise Exception("Cannot find glove files. Run glove/download_glove.sh to download glove files.")
         if encoder_name == 'cnn':
             encoder_class = CNNSentenceEncoder
-        else:
+        elif encoder_name == 'rnn' or encoder_name == 'dummy':
             encoder_class = DummySentenceEncoder
+        else:
+            encoder_class = ATTNSentenceEncoder
+        print(encoder_class)
         sentence_encoder = encoder_class(
                 glove_mat,
                 glove_word2id,

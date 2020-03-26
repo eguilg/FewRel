@@ -6,7 +6,8 @@ import torch
 from torch import autograd, optim, nn
 from torch.autograd import Variable
 from torch.nn import functional as F
-from .attention_layer import AttentionLayer
+from .attention_layer import SelfAttention
+
 
 class MLAN(fewshot_re_kit.framework.FewShotREModel):
 
@@ -15,18 +16,19 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		self.hidden_size = hidden_size
 		self.drop = nn.Dropout()
 		# for sentence level self-attention
-		self.self_attn = AttentionLayer(in_dim=hidden_size, out_dim=hidden_size, num_heads=5, dropout=0.1)
+		# self.self_attn = nn.TransformerEncoderLayer(hidden_size=hidden_size,  num_heads=5, dropout=0.1)
 		# for sentence level cross attention
-		self.cross_attn = AttentionLayer(in_dim=hidden_size, out_dim=hidden_size, num_heads=5, dropout=0.1)
+		self.cross_attn = nn.TransformerDecoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
 		# for sentence level self-attention
-		self.agg_attn = AttentionLayer(in_dim=hidden_size, out_dim=hidden_size, num_heads=5, dropout=0.1)
+		# self.agg_attn = nn.TransformerEncoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
 
 		# for instance-level attention
 		self.fc = nn.Linear(hidden_size, hidden_size, bias=True)
+		# self.inst_attn = nn.TransformerEncoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
 		# for feature-level attention
-		self.conv1 = nn.Conv2d(1, 32, (shots, 1), padding=(shots // 2, 0))
-		self.conv2 = nn.Conv2d(32, 64, (shots, 1), padding=(shots // 2, 0))
-		self.conv_final = nn.Conv2d(64, 1, (shots, 1), stride=(shots, 1))
+		# self.conv1 = nn.Conv2d(1, 32, (shots, 1), padding=(shots // 2, 0))
+		# self.conv2 = nn.Conv2d(32, 64, (shots, 1), padding=(shots // 2, 0))
+		# self.conv_final = nn.Conv2d(64, 1, (shots, 1), stride=(shots, 1))
 
 	def __dist__(self, x, y, dim, score=None):
 		if score is None:
@@ -75,46 +77,36 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		query_for_cross = query.contiguous().view(B, NQ, 1, QL, D).expand(-1, -1, N, -1, -1).contiguous().view(-1, QL, D)  # (B*NQ*N, QL, D)
 		support_mask_for_cross = support_mask.contiguous().view(B, 1, N, K*SL).expand(-1, NQ, -1, -1).contiguous().view(-1, K*SL)  #(B*NQ*N, K*SL)
 		query_mask_for_cross = query_mask.contiguous().view(B, NQ, 1, QL).expand(-1, -1, N, -1).contiguous().view(-1, QL)  # (B*NQ*N, QL)
-		# print(support.shape, query.shape)
+
 		support = self.cross_attn(
-			hidden_states=support_for_cross,
-			attention_mask=support_mask_for_cross,
-			attend_hidden_states=query_for_cross,
-			attend_attention_mask=query_mask_for_cross
-		)[0]  # (B*NQ*N, K*SL, D)
+			tgt=support_for_cross.transpose(0, 1),
+			memory=query_for_cross.transpose(0, 1),
+			tgt_key_padding_mask=~support_mask_for_cross.bool(),
+			memory_key_padding_mask=~query_mask_for_cross.bool()
+		).transpose(0, 1)  # (B*NQ*N, K*SL, D)
 		query = self.cross_attn(
-			hidden_states=query_for_cross,
-			attention_mask=query_mask_for_cross,
-			attend_hidden_states=support_for_cross,
-			attend_attention_mask=support_mask_for_cross
-		)[0]  # (B*NQ*N, QL, D)
+			tgt=query_for_cross.transpose(0, 1),
+			memory=support_for_cross.transpose(0, 1),
+			tgt_key_padding_mask=~query_mask_for_cross.bool(),
+			memory_key_padding_mask=~support_mask_for_cross.bool()
+		).transpose(0, 1)  # (B*NQ*N, QL, D)
 
 		# support = support_for_cross
 		# query = query_for_cross
 		del support_for_cross, query_for_cross
 
-		#  aggregation
-		# support = self.agg_attn(support, support_mask_for_cross)[0]
-		# query = self.agg_attn(query, query_mask_for_cross)[0]
-
-		# reduce
+		# pool sentence into 1 vector
 		support = support - (1.0 - support_mask_for_cross.float()[:, :, None]) * 10000
 		query = query - (1.0 - query_mask_for_cross.float()[:, :, None]) * 10000
 		support = support.view(B * NQ * N * K, SL, D).max(1)[0]  # (B*NQ*N*K, D)
 		query = query.max(1)[0]  # (B*NQ*N, D)
 		del support_mask_for_cross, query_mask_for_cross
 
-		# feature-level attention
-		fea_att_score = support.view(B, NQ, N, 1, K, self.hidden_size).mean(1).view(B*N, 1, K, D)  # (B * N, 1, K, D)
-		fea_att_score = F.relu(self.conv1(fea_att_score))  # (B * N, 32, K, D)
-		fea_att_score = F.relu(self.conv2(fea_att_score))  # (B * N, 64, K, D)
-		fea_att_score = self.drop(fea_att_score)
-		fea_att_score = self.conv_final(fea_att_score)  # (B * N, 1, 1, D)
-		fea_att_score = F.relu(fea_att_score)
-		fea_att_score = fea_att_score.view(B, 1, N, self.hidden_size)  # (B, 1, N, D)
 
-		# print(fea_att_score)
 		# instance-level attention
+		# support = support.view(B*NQ, N*K, D)
+		# query = query.view(B*NQ, )
+
 		support = support.contiguous().view(B, NQ, N, K, D)  # (B, NQ, N, K, D)
 		support_for_att = self.fc(support)
 		query = query.contiguous().view(B, NQ, N, D)  # B, NQ, N, D
@@ -125,7 +117,7 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		# Prototypical Networks
 		# print(((support_proto * query).sum(-1)<0).sum())
 		# logits = -torch.tanh(support_proto *  query).sum(-1).view(-1, N)
-		logits = -self.__batch_dist__(support_proto, query, fea_att_score).view(-1, N)
+		logits = -self.__batch_dist__(support_proto, query, None).view(-1, N)
 		_, pred = torch.max(logits.view(-1, N), 1)
 		# print(logits)
 		return logits, pred
