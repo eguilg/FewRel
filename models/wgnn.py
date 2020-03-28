@@ -13,15 +13,10 @@ import fewshot_re_kit
 def clip_grad_by_norm_(grad, max_norm):
 
 	"""
-
 	in-place gradient clipping.
-
 	:param grad: list of gradients
-
 	:param max_norm: maximum norm allowable
-
 	:return:
-
 	"""
 	total_norm = 0
 	counter = 0
@@ -35,6 +30,7 @@ def clip_grad_by_norm_(grad, max_norm):
 		for g in grad:
 			g.data.mul_(clip_coef)
 	return total_norm/counter
+
 
 class SelfAttention(nn.Module):
 	def __init__(self, hidden_size, num_heads, dropout=0.1):
@@ -87,16 +83,16 @@ class SelfOutput(nn.Module):
 		super().__init__()
 		self.in_dim = in_dim
 		self.out_dim = out_dim
-		# self.dense = nn.Linear(in_dim, in_dim)
-		# self.LayerNorm = nn.LayerNorm(in_dim, eps=1e-12)
+		self.dense = nn.Linear(in_dim, in_dim)
+		self.LayerNorm = nn.LayerNorm(in_dim, eps=1e-12)
 		self.dropout = nn.Dropout(dropout)
 		if out_dim != in_dim:
 			self.dense2 = nn.Linear(in_dim, out_dim)
 
 	def forward(self, hidden_states, input_tensor):
-		# hidden_states = self.dense(hidden_states)
-		# hidden_states = self.dropout(hidden_states)
-		# hidden_states = self.LayerNorm(hidden_states + input_tensor)
+		hidden_states = self.dense(hidden_states)
+		hidden_states = self.dropout(hidden_states)
+		hidden_states = self.LayerNorm(hidden_states + input_tensor)
 		if self.out_dim != self.in_dim:
 			hidden_states = self.dense2(F.leaky_relu(hidden_states))
 		return hidden_states
@@ -111,13 +107,12 @@ class AtentionLayer(nn.Module):
 	def forward(self, hidden_states):
 		self_outputs = self.self(hidden_states)
 		attention_output = self.output(self_outputs[0], hidden_states)
-		# attention_output = self_outputs[0]
 		outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
 		return outputs
 
 
 class WGNN_core(nn.Module):
-	def __init__(self, in_dim, out_dim, num_heads, num_layer=2, dropout=0.2):
+	def __init__(self, in_dim, out_dim, num_heads, num_layer=2, dropout=0.1):
 		super().__init__()
 		self.in_dim = in_dim
 		self.out_dim = out_dim
@@ -125,10 +120,11 @@ class WGNN_core(nn.Module):
 			AtentionLayer(in_dim, in_dim, num_heads, dropout) for _ in range(num_layer)
 		])
 		self.last = AtentionLayer(in_dim, out_dim, num_heads, dropout)
+
 	def forward(self, hidden_states):
 		for i, layer_module in enumerate(self.layers):
 			out = layer_module(hidden_states)[0]
-			hidden_states = out + hidden_states
+			hidden_states = hidden_states + out
 		hidden_states = self.last(hidden_states)[0]
 		return hidden_states
 
@@ -172,26 +168,27 @@ class WGNN(fewshot_re_kit.framework.FewShotREModel):
 		support_idxs = torch.arange(0, N, device=support.device)[None, :, None].expand(B, -1, K).contiguous().view(B, N*K)
 		query_idxs = torch.tensor([N], device=query.device)[None, :, None].expand(B, -1, total_Q).contiguous().view(B, total_Q)
 
-		support_lb_emb = self.label_embeddings(support_idxs)  # B, N*K, D
-		query_lb_emb = self.label_embeddings(query_idxs)  # B, total_Q, D
+		support_W_init = self.label_embeddings(support_idxs)  # B, N*K, D
+		query_W_init = self.label_embeddings(query_idxs)  # B, total_Q, D
 
-		support_W_init = torch.cat([support_lb_emb, support], dim=-1)  # B, N*K, D_
-		support_W_init = support_W_init.unsqueeze(1).expand(-1, total_Q, -1, -1).contiguous().view(B * total_Q, N * K,
-																								   -1)  # B, total_Q, N*K, D_
-		query_W_init = torch.cat([query_lb_emb,  query], dim=-1)  # B, total_Q, D_
-		query_W_init = query_W_init.contiguous().view(B * total_Q, 1, -1)  # B*total_Q, 1, D_
+		support_W_init = torch.cat([support_W_init, support], dim=-1)  # B, N*K, 2D
+		query_W_init = torch.cat([query_W_init, query], dim=-1)  # B, total_Q, 2D
 
-		w = torch.cat([support_W_init, query_W_init], dim=1)  # B*total, N*K + 1, Dlb
-		# w = torch.tensor(w, requires_grad=False)
-		w = self.gnn_obj(w)  # (B*total_Q, N*K+1, D)
-		wq = w[:, N * K:]  # B*total_Q, 1, D
-		w = w[:, :N * K].contiguous().view(B * total_Q, N, K, D).mean(2)  # B*total_Q, N, D
-		# w = torch.cat([w, wq], dim=1)  # B*total_Q, N+1, D
-		logits = torch.matmul(w, query.contiguous().view(-1, D, 1)).squeeze(-1)  # B*total_Q, N
+		w = torch.cat([support_W_init, query_W_init], dim=1)  # B, N*K + total_Q, 2D
+		w = self.gnn_obj(w)  # (B, N*K+total_Q, D)
+		w_q = w[:, N*K:]
+		w = w[:, :N*K]
+
+		w = w.contiguous().view(B, N, K, -1).mean(2).unsqueeze(1).expand(-1, total_Q, N, -1)  # B, total_Q, N, D
+		if self.na_rate > 0:
+			w = torch.cat([w, w_q.unsqueeze(2)], dim=2).transpose(-1, -2)  # B, total_Q, D, N+1
+			logits = torch.matmul(query.contiguous().view(-1, 1, D), w.contiguous().view(-1, D, N+1)).squeeze().contiguous()
+		else:
+			w = w.transpose(-1, -2)
+			logits = torch.matmul(query.contiguous().view(-1, 1, D), w.contiguous().view(-1, D, N)).squeeze().contiguous()
 		# print(logits.shape)
 		_, pred = torch.max(logits, 1)
 		return logits, pred
-
 
 
 
@@ -212,7 +209,7 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		emb_w[N, :] = 0.5
 		self.fc = nn.Linear(hidden_size, N+1, bias=False)
 		self.label_embeddings = nn.Embedding.from_pretrained(emb_w, freeze=False)
-		self.gnn_obj = WGNN_core(hidden_size*2 + N + extra, hidden_size, num_heads, num_layer=3)
+		self.gnn_obj = WGNN_core(hidden_size*2 + N + extra, hidden_size, num_heads, num_layer=2)
 
 		self.meta_lr = meta_lr
 		self.meta_update_step = meta_update_step
@@ -282,19 +279,25 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		query_lb_emb = self.label_embeddings(query_idxs)  # B, total_Q, D
 
 		support_W_init = torch.cat([support_lb_emb, support_w, support], dim=-1)    # B, N*K, D_
-		support_W_init = support_W_init.unsqueeze(1).expand(-1, total_Q, -1, -1).contiguous().view(B*total_Q, N*K, -1)  # B, total_Q, N*K, D_
+		# support_W_init = support_W_init.unsqueeze(1).expand(-1, total_Q, -1, -1).contiguous().view(B*total_Q, N*K, -1)  # B, total_Q, N*K, D_
 		query_W_init = torch.cat([query_lb_emb, query_w, query], dim=-1)  # B, total_Q, D_
-		query_W_init = query_W_init.contiguous().view(B*total_Q, 1, -1)  # B*total_Q, 1, D_
+		# query_W_init = query_W_init.contiguous().view(B*total_Q, 1, -1)  # B*total_Q, 1, D_
 
-		w = torch.cat([support_W_init, query_W_init], dim=1)  # B*total, N*K + 1, Dlb
+		w = torch.cat([support_W_init, query_W_init], dim=1)  # B, N*K + total_Q, Dlb
 		# w = torch.tensor(w, requires_grad=False)
-		w = self.gnn_obj(w)  # (B*total_Q, N*K+1, D)
-		wq = w[:, N*K:].unsqueeze(2).expand(-1, -1, K, -1)  # B*total_Q, 1, K, D
-		w = w[:, :N*K].contiguous().view(B*total_Q, N, K, D)  # B*total_Q, N, K, D
-		w = torch.cat([w, wq], dim=1).contiguous().view(B*total_Q, (N+1)*K, D)  # B*total_Q, (N+1 * K), D
-		logits = torch.matmul(w, query.contiguous().view(-1, D, 1)).squeeze(-1)  # B*total_Q, (N+1)*K
-		logits = logits.contiguous().view(B*total_Q, N+1, K)
-		logits = (logits.min(-1)[0] + logits.max(-1)[0] + logits.mean(-1)) / 3  # select max similar
+		w = self.gnn_obj(w)  # (B, N*K+total_Q, D)
+		w_q = w[:, N * K:]
+		w = w[:, :N * K]
+
+		w = w.contiguous().view(B, N, K, -1).mean(2).unsqueeze(1).expand(-1, total_Q, N, -1)  # B, total_Q, N, D
+		if self.na_rate > 0:
+			w = torch.cat([w, w_q.unsqueeze(2)], dim=2).transpose(-1, -2)  # B, total_Q, D, N+1
+			logits = torch.matmul(query.contiguous().view(-1, 1, D),
+								  w.contiguous().view(-1, D, N + 1)).squeeze().contiguous()
+		else:
+			w = w.transpose(-1, -2)
+			logits = torch.matmul(query.contiguous().view(-1, 1, D),
+								  w.contiguous().view(-1, D, N)).squeeze().contiguous()
 		# print(logits.shape)
 		logits_meta[:, :logits.shape[1]] = (logits_meta[:, :logits.shape[1]] + logits) / 2
 		# logits = (logits + logits_meta) / 2

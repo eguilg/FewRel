@@ -179,7 +179,7 @@ def main():
     if model_name == 'proto':
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'mlan':
-        model = MLAN(sentence_encoder, hidden_size=opt.hidden_size, shots=K)
+        model = MLAN(sentence_encoder, hidden_size=opt.hidden_size, N=N)
     elif model_name == 'hatt':
         model = ProtoHATT(sentence_encoder, hidden_size=opt.hidden_size, shots=K)
     elif model_name == 'gnn':

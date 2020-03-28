@@ -2,43 +2,50 @@ import sys
 
 sys.path.append('..')
 import fewshot_re_kit
+import numpy as np
 import torch
 from torch import autograd, optim, nn
 from torch.autograd import Variable
 from torch.nn import functional as F
-from .attention_layer import SelfAttention
+# from .attention_layer import SelfAttention
+
+def position_encoding_init(n_position, emb_dim):
+	''' Init the sinusoid position encoding table '''
+	# keep dim 0 for padding token position encoding zero vector
+	position_enc = np.array([
+		[pos / np.power(10000, 2.0 * (j // 2) / emb_dim) for j in range(emb_dim)]
+		for pos in range(n_position)])
+	position_enc[:, 0::2] = np.sin(position_enc[:, 0::2])  # apply sin on 0th,2nd,4th...emb_dim
+	position_enc[:, 1::2] = np.cos(position_enc[:, 1::2])  # apply cos on 1st,3rd,5th...emb_dim
+	return torch.from_numpy(position_enc).float()
 
 
 class MLAN(fewshot_re_kit.framework.FewShotREModel):
-
-	def __init__(self, sentence_encoder, shots, hidden_size=230):
+	def __init__(self, sentence_encoder, N, hidden_size=230):
 		fewshot_re_kit.framework.FewShotREModel.__init__(self, sentence_encoder)
 		self.hidden_size = hidden_size
-		self.drop = nn.Dropout()
-		# for sentence level self-attention
-		# self.self_attn = nn.TransformerEncoderLayer(hidden_size=hidden_size,  num_heads=5, dropout=0.1)
+		pos_embs = position_encoding_init(sentence_encoder.max_length, hidden_size)
+		self.positional_embeddings = nn.Embedding.from_pretrained(pos_embs, freeze=True)
 		# for sentence level cross attention
-		self.cross_attn = nn.TransformerDecoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
-		# for sentence level self-attention
-		# self.agg_attn = nn.TransformerEncoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
+		layer = nn.TransformerEncoderLayer(d_model=hidden_size+N, nhead=5, dim_feedforward=hidden_size, dropout=0.2)
+		self.transformer = nn.TransformerEncoder(encoder_layer=layer, num_layers=1)
+		# layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=5, dim_feedforward=hidden_size, dropout=0.2)
+		self.gnn = nn.TransformerEncoder(encoder_layer=layer, num_layers=2)
 
-		# for instance-level attention
-		self.fc = nn.Linear(hidden_size, hidden_size, bias=True)
-		# self.inst_attn = nn.TransformerEncoderLayer(d_model=hidden_size,  nhead=5, dim_feedforward=512, dropout=0.1)
-		# for feature-level attention
-		# self.conv1 = nn.Conv2d(1, 32, (shots, 1), padding=(shots // 2, 0))
-		# self.conv2 = nn.Conv2d(32, 64, (shots, 1), padding=(shots // 2, 0))
-		# self.conv_final = nn.Conv2d(64, 1, (shots, 1), stride=(shots, 1))
+		self.fc = nn.Linear(8*hidden_size+8*N, hidden_size, bias=True)
+		emb_w = torch.eye(N)
+		self.label_embeddings = nn.Embedding.from_pretrained(emb_w, freeze=True)
 
-	def __dist__(self, x, y, dim, score=None):
-		if score is None:
-			return (torch.pow(x - y, 2)).sum(dim)
-		else:
-			return (torch.pow(x - y, 2) * score).sum(dim)
 
-	def __batch_dist__(self, S, Q, score=None):
-		# print(S.shape, Q.shape, score.shape)
-		return self.__dist__(S, Q, 3, score)
+	def fuse(self, m1, m2, dim):
+		return torch.cat([m1, m2, torch.abs(m1 - m2), m1 * m2], dim)
+
+	def seq_pooling(self, seq, mask):
+		mask = mask.float()
+		mean = seq.sum(1) / mask.sum(1, keepdim=True)
+		max = torch.max((seq - (1.0 - mask[:, :, None]) * 10000), dim=1)[0]
+		vec = torch.cat([mean, max], dim=1)
+		return vec
 
 	def forward(self, support, query, N, K, Q):
 		'''
@@ -50,76 +57,85 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		'''
 		support_mask = support['mask']  # (B*N*K, L)
 		query_mask = query['mask']  # (B*NQ, L)
+
+		# get support and query lengths
 		SL = support_mask.sum(1).max().item()  # support batch max length
 		QL = query_mask.sum(1).max().item()  # query batch max length
-		# print(support['mask'].sum(1).max())
 		D = self.hidden_size  # hidden size
+
+		# get encodings
 		support = self.sentence_encoder(support, pool=False)  # (B * N * K, L, D)
 		query = self.sentence_encoder(query, pool=False)  # （B * NQ, L, D）
+
+		# cut paddings
 		support = support[:, :SL]  # cut pads
 		support_mask = support_mask[:, :SL]
 		query = query[:, :QL]  # cut pads
 		query_mask = query_mask[:, :QL]
-		support = support.contiguous().view(-1, N*K, SL, D)  # (B, N * K, SL, D)
+
+		# get batch size and NQ
+		support = support.contiguous().view(-1, N * K, SL, D)  # (B, N * K, SL, D)
 		B = support.shape[0]  # batch size
 		query = query.contiguous().view(B, -1, QL, D)  # (B, NQ, QL, D)
 		NQ = query.shape[1]  # num of instances for each batch in query set
 
-		# sentence level self attention
-		support = support.view(B*N, K*SL, D)
-		support_mask = support_mask.contiguous().view(B*N, K*SL)
-		query = query.view(B*NQ, QL, D)
-		# support = self.self_attn(hidden_states=support, attention_mask=support_mask)[0]  # (B*N, K*SL, D)
-		# query = self.self_attn(hidden_states=query, attention_mask=query_mask)[0]  # (B*NQ, QL, D)
 
-		# sentence level cross attention
-		support_for_cross = support.contiguous().view(B, 1, N*K, SL, D).expand(-1, NQ, -1, -1, -1).contiguous().view(-1, K*SL, D)  # (B*NQ*N, K*SL, D)
-		query_for_cross = query.contiguous().view(B, NQ, 1, QL, D).expand(-1, -1, N, -1, -1).contiguous().view(-1, QL, D)  # (B*NQ*N, QL, D)
-		support_mask_for_cross = support_mask.contiguous().view(B, 1, N, K*SL).expand(-1, NQ, -1, -1).contiguous().view(-1, K*SL)  #(B*NQ*N, K*SL)
-		query_mask_for_cross = query_mask.contiguous().view(B, NQ, 1, QL).expand(-1, -1, N, -1).contiguous().view(-1, QL)  # (B*NQ*N, QL)
 
-		support = self.cross_attn(
-			tgt=support_for_cross.transpose(0, 1),
-			memory=query_for_cross.transpose(0, 1),
-			tgt_key_padding_mask=~support_mask_for_cross.bool(),
-			memory_key_padding_mask=~query_mask_for_cross.bool()
-		).transpose(0, 1)  # (B*NQ*N, K*SL, D)
-		query = self.cross_attn(
-			tgt=query_for_cross.transpose(0, 1),
-			memory=support_for_cross.transpose(0, 1),
-			tgt_key_padding_mask=~query_mask_for_cross.bool(),
-			memory_key_padding_mask=~support_mask_for_cross.bool()
-		).transpose(0, 1)  # (B*NQ*N, QL, D)
+		########### sentence level cross attention ##########
+		# all query in 1 line
+		query = query.contiguous().view(B, NQ * QL, D)  # (B, NQ*QL, D)
+		query_mask = query_mask.contiguous().view(B, NQ * QL)  # (B, NQ*QL)
+		# all support in 1 line
+		support = support.contiguous().view(B, N * K * SL, D)  # (B, N*K*SL, D)
+		support_mask = support_mask.contiguous().view(B, N*K*SL)
 
-		# support = support_for_cross
-		# query = query_for_cross
-		del support_for_cross, query_for_cross
+		support_idxs = torch.arange(0, N, device=support.device)
+		support_lb_emb = self.label_embeddings(support_idxs)  # N, N
+		query_lb_emb = torch.tensor([1.0/N]*N, device=query.device)  # N
+		support_lb = support_lb_emb[None, :, None, :].expand(B, -1, K * SL, -1).contiguous().view(B, N*K*SL, -1)
+		query_lb = query_lb_emb[None, None, :].expand(B, NQ*QL, -1)
+		support = torch.cat([support_lb, support], dim=2)  # B, N*K*SL, D+N
+		query = torch.cat([query_lb, query], dim=2)  # B, NQ*QL, D+N
+		D = D+N
+
+		# cat 1 query and K support together
+		seq = torch.cat([query, support], dim=1)  # (B, NQ*QL+N*K*SL, D)
+		seq_mask = torch.cat([query_mask, support_mask], dim=1)  # (B, NQ*QL+N*K*SL)
+		seq = self.transformer(src=seq.transpose(0, 1),
+									src_key_padding_mask=~seq_mask.bool()).transpose(0, 1)
+		query_ = seq[:, :NQ*QL]  # B, NQ*QL, D
+		support_ = seq[:, NQ*QL:]  # B, N*K*SL, D
+		query_mask = seq_mask[:, :NQ*QL].contiguous().view(B*NQ, QL)  # B*NQ, QL
+		support_mask = seq_mask[:, NQ*QL:].contiguous().view(B*N*K, SL)  # B*N*K, SL
+
+		query = self.fuse(query, query_, dim=2).contiguous().view(B*NQ, QL, 4*D)   # 4D
+		support = self.fuse(support, support_, dim=2).contiguous().view(B*N*K, SL, 4*D)  # 4D
 
 		# pool sentence into 1 vector
-		support = support - (1.0 - support_mask_for_cross.float()[:, :, None]) * 10000
-		query = query - (1.0 - query_mask_for_cross.float()[:, :, None]) * 10000
-		support = support.view(B * NQ * N * K, SL, D).max(1)[0]  # (B*NQ*N*K, D)
-		query = query.max(1)[0]  # (B*NQ*N, D)
-		del support_mask_for_cross, query_mask_for_cross
+		query = self.seq_pooling(query, query_mask).contiguous().view(B, NQ, 8*D)  # 8D
+		support = self.seq_pooling(support, support_mask).contiguous().view(B, N*K, 8*D)  # 8D
 
+		# dim reduce
+		D = self.hidden_size
+		query = self.fc(query)  # D
+		support = self.fc(support)  # D
 
-		# instance-level attention
-		# support = support.view(B*NQ, N*K, D)
-		# query = query.view(B*NQ, )
+		support_lb = support_lb_emb[None, :, None, :].expand(B, -1, K, -1).contiguous().view(B, N*K, -1)  # B, N*K, N
+		query_lb = query_lb_emb[None, None, :].expand(B, NQ, -1).view(B, NQ, -1)
+		support = torch.cat([support_lb, support], dim=2)  # B, N*K, D+N
+		query = torch.cat([query_lb, query], dim=2)  # B, NQ, D+N
+		D = D + N
 
-		support = support.contiguous().view(B, NQ, N, K, D)  # (B, NQ, N, K, D)
-		support_for_att = self.fc(support)
-		query = query.contiguous().view(B, NQ, N, D)  # B, NQ, N, D
-		query_for_att = self.fc(query).unsqueeze(3).expand(-1, -1, -1, K, D)  # B, NQ, N, K, D
-		ins_att_score = F.softmax(torch.tanh(support_for_att * query_for_att).sum(-1), dim=-1)  # (B, NQ, N, K)
-		support_proto = (support * ins_att_score.unsqueeze(4).expand(-1, -1, -1, -1, self.hidden_size)).sum(3)  # (B, NQ, N, D)
+		w = torch.cat([support, query], dim=1)  # B, N*K+NQ, D+N
+		w = self.gnn(src=w.transpose(0, 1)).transpose(0, 1)  # B, N*K+NQ, D+N
+		w_q = w[:, N * K:]
+		w = w[:, :N * K]
 
-		# Prototypical Networks
-		# print(((support_proto * query).sum(-1)<0).sum())
-		# logits = -torch.tanh(support_proto *  query).sum(-1).view(-1, N)
-		logits = -self.__batch_dist__(support_proto, query, None).view(-1, N)
+		w = w.contiguous().view(B, N, K, -1).mean(2).unsqueeze(1).expand(-1, NQ, N, -1)  # B, total_Q, N, D
+		w = w.transpose(-1, -2)
+		logits = torch.matmul(query.contiguous().view(-1, 1, D),
+							  w.contiguous().view(-1, D, N)).squeeze().contiguous()
 		_, pred = torch.max(logits.view(-1, N), 1)
-		# print(logits)
-		return logits, pred
 
+		return logits, pred
 
