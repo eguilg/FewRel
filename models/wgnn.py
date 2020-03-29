@@ -236,7 +236,7 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		logits_meta = []
 		fast_weights = []
 		if not self.training:
-			update_step = self.meta_update_step * 2
+			update_step = self.meta_update_step# * 2
 		else:
 			update_step = self.meta_update_step
 		for i in range(B):
@@ -289,9 +289,10 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		w_q = w[:, N * K:]
 		w = w[:, :N * K]
 
+
 		w = w.contiguous().view(B, N, K, -1).mean(2).unsqueeze(1).expand(-1, total_Q, N, -1)  # B, total_Q, N, D
 		if self.na_rate > 0:
-			w = torch.cat([w, w_q.unsqueeze(2)], dim=2).transpose(-1, -2)  # B, total_Q, D, N+1
+			w = torch.cat([w, query.unsqueeze(2)], dim=2).transpose(-1, -2)  # B, total_Q, D, N+1
 			logits = torch.matmul(query.contiguous().view(-1, 1, D),
 								  w.contiguous().view(-1, D, N + 1)).squeeze().contiguous()
 		else:
