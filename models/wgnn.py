@@ -213,6 +213,15 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 
 		self.meta_lr = meta_lr
 		self.meta_update_step = meta_update_step
+	def loss(self, logits, label):
+		'''
+		logits: Logits with the size (..., class_num)
+		label: Label with whatever size.
+		return: [Loss] (A single value)
+		'''
+		logits, J_incon = logits
+		N = logits.size(-1)
+		return self.cost(logits.view(-1, N), label.view(-1)) + J_incon
 
 	def forward(self, support, query, N, K, total_Q):
 		'''
@@ -236,7 +245,7 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		logits_meta = []
 		fast_weights = []
 		if not self.training:
-			update_step = self.meta_update_step# * 2
+			update_step = self.meta_update_step * 2
 		else:
 			update_step = self.meta_update_step
 		for i in range(B):
@@ -289,16 +298,15 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		w_q = w[:, N * K:]
 		w = w[:, :N * K]
 
+		w = w.contiguous().view(-1, K, D)  # B*N, K, D
+		proto = w.mean(1)  # prototype  B*N, D
 
-		w = w.contiguous().view(B, N, K, -1).mean(2).unsqueeze(1).expand(-1, total_Q, N, -1)  # B, total_Q, N, D
-		if self.na_rate > 0:
-			w = torch.cat([w, query.unsqueeze(2)], dim=2).transpose(-1, -2)  # B, total_Q, D, N+1
-			logits = torch.matmul(query.contiguous().view(-1, 1, D),
-								  w.contiguous().view(-1, D, N + 1)).squeeze().contiguous()
-		else:
-			w = w.transpose(-1, -2)
-			logits = torch.matmul(query.contiguous().view(-1, 1, D),
-								  w.contiguous().view(-1, D, N)).squeeze().contiguous()
+		J_incon = torch.sum((proto.unsqueeze(1) * w), 2)
+		J_incon = 1 - (J_incon / (torch.norm(proto.unsqueeze(1), dim=-1) * torch.norm(w, dim=-1)))
+		J_incon = J_incon.mean()
+		proto = proto.view(-1, N, D).unsqueeze(1).expand(-1, total_Q, N, D)  # B, total_Q, N, D
+		w_q = w_q.contiguous().view(-1, total_Q, 1, D)
+		logits = torch.sum((w_q * proto), dim=3).view(-1, N)
 		# print(logits.shape)
 		logits_meta[:, :logits.shape[1]] = (logits_meta[:, :logits.shape[1]] + logits) / 2
 		# logits = (logits + logits_meta) / 2
@@ -308,4 +316,4 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 			logits = logits[:, :N]
 
 		_, pred = torch.max(logits, 1)
-		return logits, pred
+		return (logits, J_incon), pred

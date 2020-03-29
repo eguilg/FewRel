@@ -25,14 +25,14 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		fewshot_re_kit.framework.FewShotREModel.__init__(self, sentence_encoder)
 		self.hidden_size = hidden_size
 		pos_embs = position_encoding_init(sentence_encoder.max_length, hidden_size)
-		self.positional_embeddings = nn.Embedding.from_pretrained(pos_embs, freeze=True)
+		self.positional_embeddings = nn.Embedding.from_pretrained(pos_embs, freeze=False)
 		# for sentence level cross attention
 		layer = nn.TransformerEncoderLayer(d_model=hidden_size+N, nhead=5, dim_feedforward=hidden_size, dropout=0.2)
 		self.transformer = nn.TransformerEncoder(encoder_layer=layer, num_layers=1)
-		# layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=5, dim_feedforward=hidden_size, dropout=0.2)
+		layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=5, dim_feedforward=hidden_size, dropout=0.2)
 		self.gnn = nn.TransformerEncoder(encoder_layer=layer, num_layers=2)
 
-		self.fc = nn.Linear(8*hidden_size+8*N, hidden_size, bias=True)
+		self.fc = nn.Linear(9*hidden_size+8*N, hidden_size, bias=True)
 		emb_w = torch.eye(N)
 		self.label_embeddings = nn.Embedding.from_pretrained(emb_w, freeze=True)
 
@@ -79,7 +79,8 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		query = query.contiguous().view(B, -1, QL, D)  # (B, NQ, QL, D)
 		NQ = query.shape[1]  # num of instances for each batch in query set
 
-
+		support_max = support.max(2)[0].contiguous().view(B, -1, D)
+		query_max = query.max(2)[0].contiguous().view(B, -1, D)
 
 		########### sentence level cross attention ##########
 		# all query in 1 line
@@ -91,7 +92,7 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 
 		support_idxs = torch.arange(0, N, device=support.device)
 		support_lb_emb = self.label_embeddings(support_idxs)  # N, N
-		query_lb_emb = torch.tensor([1.0/N]*N, device=query.device)  # N
+		query_lb_emb = self.label_embeddings.weight.mean(dim=0)  # N
 		support_lb = support_lb_emb[None, :, None, :].expand(B, -1, K * SL, -1).contiguous().view(B, N*K*SL, -1)
 		query_lb = query_lb_emb[None, None, :].expand(B, NQ*QL, -1)
 		support = torch.cat([support_lb, support], dim=2)  # B, N*K*SL, D+N
@@ -114,17 +115,18 @@ class MLAN(fewshot_re_kit.framework.FewShotREModel):
 		# pool sentence into 1 vector
 		query = self.seq_pooling(query, query_mask).contiguous().view(B, NQ, 8*D)  # 8D
 		support = self.seq_pooling(support, support_mask).contiguous().view(B, N*K, 8*D)  # 8D
-
+		query = torch.cat([query_max, query], dim=-1)
+		support = torch.cat([support_max, support], dim=-1)
 		# dim reduce
 		D = self.hidden_size
 		query = self.fc(query)  # D
 		support = self.fc(support)  # D
 
-		support_lb = support_lb_emb[None, :, None, :].expand(B, -1, K, -1).contiguous().view(B, N*K, -1)  # B, N*K, N
-		query_lb = query_lb_emb[None, None, :].expand(B, NQ, -1).view(B, NQ, -1)
-		support = torch.cat([support_lb, support], dim=2)  # B, N*K, D+N
-		query = torch.cat([query_lb, query], dim=2)  # B, NQ, D+N
-		D = D + N
+		# support_lb = support_lb_emb[None, :, None, :].expand(B, -1, K, -1).contiguous().view(B, N*K, -1)  # B, N*K, N
+		# query_lb = query_lb_emb[None, None, :].expand(B, NQ, -1).view(B, NQ, -1)
+		# support = torch.cat([support_lb, support], dim=2)  # B, N*K, D+N
+		# query = torch.cat([query_lb, query], dim=2)  # B, NQ, D+N
+		# D = D + N
 
 		w = torch.cat([support, query], dim=1)  # B, N*K+NQ, D+N
 		w = self.gnn(src=w.transpose(0, 1)).transpose(0, 1)  # B, N*K+NQ, D+N

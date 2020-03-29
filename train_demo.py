@@ -5,6 +5,7 @@ import models
 from models.proto import Proto
 from models.proto_hatt import ProtoHATT
 from models.mlan import MLAN
+from models.poly import Poly
 from models.gnn import GNN
 from models.wgnn import WGNN, MetaWGNN
 from models.gog import GOG
@@ -41,7 +42,7 @@ def main():
             help='Num of query per class')
     parser.add_argument('--batch_size', default=4, type=int,
             help='batch size')
-    parser.add_argument('--train_iter', default=30000, type=int,
+    parser.add_argument('--train_iter', default=50000, type=int,
             help='num of iters in training')
     parser.add_argument('--val_iter', default=1000, type=int,
             help='num of iters in validation')
@@ -180,6 +181,8 @@ def main():
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'mlan':
         model = MLAN(sentence_encoder, hidden_size=opt.hidden_size, N=N)
+    elif model_name == 'poly':
+        model = Poly(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'hatt':
         model = ProtoHATT(sentence_encoder, hidden_size=opt.hidden_size, shots=K)
     elif model_name == 'gnn':
