@@ -11,7 +11,7 @@ from transformers import BertTokenizer, BertModel, BertForMaskedLM, BertForSeque
 class CNNSentenceEncoder(nn.Module):
 
     def __init__(self, word_vec_mat, word2id, max_length, word_embedding_dim=50, 
-            pos_embedding_dim=50, hidden_size=230):
+            pos_embedding_dim=5, hidden_size=230):
         nn.Module.__init__(self)
         self.hidden_size = hidden_size
         self.max_length = max_length
@@ -34,63 +34,36 @@ class CNNSentenceEncoder(nn.Module):
         x = self.encoder(x, pool=pool)
         return x
 
-    def tokenize(self, raw_tokens, pos_head, pos_tail):
-        # token -> index
-        tokens = []
-        cur_pos = 0
-        pos1_in_index = 0
-        pos2_in_index = 0
-        for token in raw_tokens:
-            token = token.lower()
-            if cur_pos == pos_head[0]:
-                tokens.append('[e1]')
-                pos1_in_index = len(tokens)
-            if cur_pos == pos_tail[0]:
-                tokens.append('[e2]')
-                pos2_in_index = len(tokens)
-
-            tokens.append(token)
-
-            if cur_pos == pos_head[-1]:
-                tokens.append('[/e1]')
-            if cur_pos == pos_tail[-1]:
-                tokens.append('[/e2]')
-            cur_pos += 1
-
-        indexed_tokens = []
-        for token in tokens:
-            token = token.lower()
-            if token in self.word2id:
-                indexed_tokens.append(self.word2id[token])
-            else:
-                indexed_tokens.append(self.word2id['[UNK]'])
-        # padding
-        while len(indexed_tokens) < self.max_length:
-            indexed_tokens.append(self.word2id['[PAD]'])
-        indexed_tokens = indexed_tokens[:self.max_length]
-
-        # pos
-        pos1 = np.zeros((self.max_length), dtype=np.int32)
-        pos2 = np.zeros((self.max_length), dtype=np.int32)
-        for i in range(self.max_length):
-            pos1[i] = i - pos1_in_index + self.max_length
-            pos2[i] = i - pos2_in_index + self.max_length
-        # mask
-        mask = np.zeros((self.max_length), dtype=np.int32)
-        mask[:len(tokens)] = 1
-
-        return indexed_tokens, pos1, pos2, mask
-
     # def tokenize(self, raw_tokens, pos_head, pos_tail):
     #     # token -> index
-    #     indexed_tokens = []
+    #     tokens = []
+    #     cur_pos = 0
+    #     pos1_in_index = 0
+    #     pos2_in_index = 0
     #     for token in raw_tokens:
+    #         token = token.lower()
+    #         if cur_pos == pos_head[0]:
+    #             tokens.append('[e1]')
+    #             pos1_in_index = len(tokens)
+    #         if cur_pos == pos_tail[0]:
+    #             tokens.append('[e2]')
+    #             pos2_in_index = len(tokens)
+    #
+    #         tokens.append(token)
+    #
+    #         if cur_pos == pos_head[-1]:
+    #             tokens.append('[/e1]')
+    #         if cur_pos == pos_tail[-1]:
+    #             tokens.append('[/e2]')
+    #         cur_pos += 1
+    #
+    #     indexed_tokens = []
+    #     for token in tokens:
     #         token = token.lower()
     #         if token in self.word2id:
     #             indexed_tokens.append(self.word2id[token])
     #         else:
     #             indexed_tokens.append(self.word2id['[UNK]'])
-    #     valid_len = len(indexed_tokens)
     #     # padding
     #     while len(indexed_tokens) < self.max_length:
     #         indexed_tokens.append(self.word2id['[PAD]'])
@@ -99,17 +72,44 @@ class CNNSentenceEncoder(nn.Module):
     #     # pos
     #     pos1 = np.zeros((self.max_length), dtype=np.int32)
     #     pos2 = np.zeros((self.max_length), dtype=np.int32)
-    #     pos1_in_index = min(self.max_length, pos_head[0])
-    #     pos2_in_index = min(self.max_length, pos_tail[0])
     #     for i in range(self.max_length):
     #         pos1[i] = i - pos1_in_index + self.max_length
     #         pos2[i] = i - pos2_in_index + self.max_length
-    #
     #     # mask
     #     mask = np.zeros((self.max_length), dtype=np.int32)
-    #     mask[:valid_len] = 1
+    #     mask[:len(tokens)] = 1
     #
     #     return indexed_tokens, pos1, pos2, mask
+
+    def tokenize(self, raw_tokens, pos_head, pos_tail):
+        # token -> index
+        indexed_tokens = []
+        for token in raw_tokens:
+            token = token.lower()
+            if token in self.word2id:
+                indexed_tokens.append(self.word2id[token])
+            else:
+                indexed_tokens.append(self.word2id['[UNK]'])
+        valid_len = len(indexed_tokens)
+        # padding
+        while len(indexed_tokens) < self.max_length:
+            indexed_tokens.append(self.word2id['[PAD]'])
+        indexed_tokens = indexed_tokens[:self.max_length]
+
+        # pos
+        pos1 = np.zeros((self.max_length), dtype=np.int32)
+        pos2 = np.zeros((self.max_length), dtype=np.int32)
+        pos1_in_index = min(self.max_length, pos_head[0])
+        pos2_in_index = min(self.max_length, pos_tail[0])
+        for i in range(self.max_length):
+            pos1[i] = i - pos1_in_index + self.max_length
+            pos2[i] = i - pos2_in_index + self.max_length
+
+        # mask
+        mask = np.zeros((self.max_length), dtype=np.int32)
+        mask[:valid_len] = 1
+
+        return indexed_tokens, pos1, pos2, mask
 
 
 class BERTSentenceEncoder(nn.Module):

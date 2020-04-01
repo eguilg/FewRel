@@ -219,9 +219,9 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		label: Label with whatever size.
 		return: [Loss] (A single value)
 		'''
-		logits, J_incon = logits
+		logits, J = logits
 		N = logits.size(-1)
-		return self.cost(logits.view(-1, N), label.view(-1)) + J_incon
+		return self.cost(logits.view(-1, N), label.view(-1)) + J
 
 	def forward(self, support, query, N, K, total_Q):
 		'''
@@ -301,9 +301,23 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		w = w.contiguous().view(-1, K, D)  # B*N, K, D
 		proto = w.mean(1)  # prototype  B*N, D
 
-		J_incon = torch.sum((proto.unsqueeze(1) * w), 2)
-		J_incon = 1 - (J_incon / (torch.norm(proto.unsqueeze(1), dim=-1) * torch.norm(w, dim=-1)))
-		J_incon = J_incon.mean()
+		# intra class inconsistency
+		proto_norm = F.normalize(proto, dim=-1, p=2)
+		w_norm = F.normalize(w, dim=-1, p=2)
+		intra_incon = - torch.sum(proto_norm.unsqueeze(1) * w_norm, dim=2) + 1
+		intra_incon = intra_incon.mean()
+
+		# intra_incon = torch.sum((proto.unsqueeze(1) * w), 2)
+		# intra_incon = 1 - (intra_incon / (torch.norm(proto.unsqueeze(1), dim=-1) * torch.norm(w, dim=-1)))
+		# intra_incon = intra_incon.mean()
+
+		# inter class consistency
+		# proto_norm = proto_norm.view(B, N, D)
+		# inter_con = torch.matmul(proto_norm, proto_norm.transpose(-1, -2))  # B, N, N
+		# inter_con = inter_con.triu(diagonal=1)
+		# inter_con = inter_con.clamp(0).sum() / torch.ones_like(inter_con).triu(diagonal=1).sum()
+		J = intra_incon #+ inter_con
+
 		proto = proto.view(-1, N, D).unsqueeze(1).expand(-1, total_Q, N, D)  # B, total_Q, N, D
 		w_q = w_q.contiguous().view(-1, total_Q, 1, D)
 		logits = torch.sum((w_q * proto), dim=3).view(-1, N)
@@ -316,4 +330,4 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 			logits = logits[:, :N]
 
 		_, pred = torch.max(logits, 1)
-		return (logits, J_incon), pred
+		return (logits, J), pred

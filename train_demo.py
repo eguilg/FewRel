@@ -176,7 +176,8 @@ def main():
         prefix += '-adv_' + opt.adv
     if opt.na_rate != 0:
         prefix += '-na{}'.format(opt.na_rate)
-    
+
+    encoder_p_num = sum(p.numel() for p in sentence_encoder.parameters())
     if model_name == 'proto':
         model = Proto(sentence_encoder, hidden_size=opt.hidden_size)
     elif model_name == 'mlan':
@@ -198,13 +199,17 @@ def main():
         model = SNAIL(sentence_encoder, N, K)
     elif model_name == 'metanet':
         model = MetaNet(sentence_encoder.embedding, N, max_length)
+        encoder_p_num = sum(p.numel() for p in sentence_encoder.embedding.parameters())
     elif model_name == 'siamese':
         model = Siamese(sentence_encoder, hidden_size=opt.hidden_size, dropout=opt.dropout)
     elif model_name == 'pair':
         model = Pair(sentence_encoder, hidden_size=opt.hidden_size)
     else:
         raise NotImplementedError
-    
+
+    total_p_num = sum(p.numel() for p in model.parameters()) - encoder_p_num
+    print('model param num:', total_p_num)
+
     if not os.path.exists('checkpoint'):
         os.mkdir('checkpoint')
     ckpt = 'checkpoint/{}.pth.tar'.format(prefix)
