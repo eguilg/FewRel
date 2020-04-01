@@ -134,9 +134,9 @@ python train_demo.py \
 | MetaNet(CNN)      | 64.46 | 80.57 | 53.96 | 69.23 | 
 | GNN(CNN)          | 71.91 | 80.54 | 56.10 | 64.02 | 
 | Proto(CNN)        | 63.73 | 84.84 | 58.31 | 74.72 |
-| WGNN(CNN)         | 79.53 | 86.09 | 62.97 | 74.25 |
-| MetaWGNN(CNN)     | 79.35 | 87.30 | 64.12 | 76.65 |
-| MetaWGNN(CNN)+INCON| 79.35 | 88.34 | 64.12 | 77.31 |
+| WGNN(CNN)         | 77.45 | 86.09 | 62.97 | 74.25 |
+| MetaWGNN(CNN)     | 79.53 | 87.30 | 64.12 | 76.65 |
+| MetaWGNN(CNN)+INCON| 79.53 | 88.34 | 64.12 | 77.31 |
 | MetaWGNN(RNN)     | 80.52 | 88.54 | 67.07 | 78.97 |
 | MetaWGNN(RNN)+INCON| **80.52** | **89.42** | **67.07** | **79.13** |  
 
@@ -152,7 +152,10 @@ python train_demo.py \
 | MetaWGNN-ADV(CNN)+INCON| **49.57** | **65.84** | **39.83** | **54.94** |
 
  
-param nums
-WGNN        775370
-METAWGNN(cat)    2793368
-GNN         422605
+| model | param nums |
+| ---- |----|
+| GNN  | 422605 |
+| WGNN | 728526 |
+| METAWGNN(add) |  728526 |
+| METAWGNN(cat) |  2793368 |
+
