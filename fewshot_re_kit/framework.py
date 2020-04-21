@@ -140,20 +140,30 @@ class FewShotREFramework:
         print("Start training...")
     
         # Init
+        optimizer_bert = None
+        scheduler_bert = None
         if bert_optim:
             print('Use bert optim!')
             parameters_to_optimize = list(model.named_parameters())
+            parameters_bert = list(filter(lambda x: 'bert' in x[0], parameters_to_optimize))
+            parameters_others = list(filter(lambda x: 'bert' not in x[0], parameters_to_optimize))
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-            parameters_to_optimize = [
-                {'params': [p for n, p in parameters_to_optimize 
-                    if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-                {'params': [p for n, p in parameters_to_optimize
-                    if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-                ]
-            optimizer = AdamW(parameters_to_optimize, lr=2e-5, correct_bias=False)
+            # parameters_bert = [
+            #     {'params': [p for n, p in parameters_bert
+            #         if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+            #     {'params': [p for n, p in parameters_bert
+            #         if any(nd in n for nd in no_decay)], 'weight_decay': 0.0},
+            #     ]
+            parameters_bert = [{'params':[p for n, p in parameters_bert]}]
+            parameters_others = [{
+                'params': [p for n, p in parameters_others]
+            }]
+            optimizer_bert = AdamW(parameters_bert, lr=6e-6)#, correct_bias=False)
+            optimizer = pytorch_optim(parameters_others, learning_rate, weight_decay=weight_decay)
             if self.adv:
                 optimizer_encoder = AdamW(parameters_to_optimize, lr=1e-5, correct_bias=False)
-            scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_step, num_training_steps=train_iter) 
+            scheduler_bert = get_linear_schedule_with_warmup(optimizer_bert, num_warmup_steps=warmup_step, num_training_steps=train_iter)
+            scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=lr_step_size)
         else:
             optimizer = pytorch_optim(model.parameters(),
                     learning_rate, weight_decay=weight_decay)
@@ -225,6 +235,11 @@ class FewShotREFramework:
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+                if optimizer_bert is not None:
+                    optimizer_bert.step()
+                    optimizer_bert.zero_grad()
+                if scheduler_bert is not None:
+                    scheduler_bert.step()
 
             
             # Adv part

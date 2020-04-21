@@ -16,7 +16,7 @@ class GNN(fewshot_re_kit.framework.FewShotREModel):
         fewshot_re_kit.framework.FewShotREModel.__init__(self, sentence_encoder)
         self.hidden_size = hidden_size
         self.node_dim = hidden_size + N
-        self.gnn_obj = gnn_iclr.GNN_nl(N, self.node_dim, nf=96, J=1)
+        self.gnn_obj = gnn_iclr.GNN_nl(N+1, self.node_dim, nf=96, J=1)
 
     def forward(self, support, query, N, K, total_Q):
         '''

@@ -40,7 +40,7 @@ class SelfAttention(nn.Module):
 		self.attention_head_size = int(hidden_size / num_heads)
 		self.all_head_size = self.num_attention_heads * self.attention_head_size
 		self.query = nn.Linear(self.hidden_size, self.all_head_size)
-		self.key = nn.Linear(hidden_size, self.all_head_size)
+		#self.key = nn.Linear(hidden_size, self.all_head_size)
 		self.value = nn.Linear(hidden_size, self.all_head_size)
 		self.dropout = nn.Dropout(dropout)
 
@@ -50,9 +50,10 @@ class SelfAttention(nn.Module):
 		return x.permute(0, 2, 1, 3)
 
 	def forward(self, hidden_states):
-		mixed_query_layer = self.query(hidden_states)
-		mixed_key_layer = self.key(hidden_states)
 		mixed_value_layer = self.value(hidden_states)
+		mixed_query_layer = self.query(hidden_states)
+		mixed_key_layer = self.query(hidden_states)
+
 		query_layer = self.transpose_for_scores(mixed_query_layer)
 		key_layer = self.transpose_for_scores(mixed_key_layer)
 		value_layer = self.transpose_for_scores(mixed_value_layer)
@@ -131,7 +132,7 @@ class WGNN_core(nn.Module):
 
 class WGNN(fewshot_re_kit.framework.FewShotREModel):
 
-	def __init__(self, sentence_encoder, N, hidden_size=230, num_heads=4, na_rate=0):
+	def __init__(self, sentence_encoder, N, hidden_size=230, num_heads=8, na_rate=0):
 		'''
 		N: Num of classes
 		'''
@@ -194,7 +195,7 @@ class WGNN(fewshot_re_kit.framework.FewShotREModel):
 
 class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 
-	def __init__(self, sentence_encoder, N, hidden_size=230, num_heads=4, na_rate=0,
+	def __init__(self, sentence_encoder, N, hidden_size=230, num_heads=8, na_rate=0,
 				 meta_lr=1.0, meta_update_step=5):
 		'''
 		N: Num of classes
@@ -203,14 +204,13 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		self.hidden_size = hidden_size
 		self.na_rate = na_rate
 		extra = 1
-		while (hidden_size*2 + N + extra) % num_heads != 0:
+		while (2*hidden_size + N + extra) % num_heads != 0:
 			extra += 1
 		emb_w = torch.eye(N+extra)
 		emb_w[N, :] = 0.5
 		self.fc = nn.Linear(hidden_size, N+1, bias=False)
 		self.label_embeddings = nn.Embedding.from_pretrained(emb_w, freeze=False)
-		self.gnn_obj = WGNN_core(hidden_size*2 + N + extra, hidden_size, num_heads, num_layer=2)
-
+		self.gnn_obj = WGNN_core(2*hidden_size+N+extra, hidden_size, num_heads, num_layer=2)
 		self.meta_lr = meta_lr
 		self.meta_update_step = meta_update_step
 	def loss(self, logits, label):
@@ -248,6 +248,7 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 			update_step = self.meta_update_step * 2
 		else:
 			update_step = self.meta_update_step
+
 		for i in range(B):
 			losses = []
 			# 1. run the i-th task and compute loss for k=0
@@ -287,9 +288,12 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		support_lb_emb = self.label_embeddings(support_idxs)  # B, N*K, D
 		query_lb_emb = self.label_embeddings(query_idxs)  # B, total_Q, D
 
-		support_W_init = torch.cat([support_lb_emb, support_w, support], dim=-1)    # B, N*K, D_
+		# support = self.agg(torch.cat([support_w, support, support_w * support, torch.abs(support - support_w)], -1))
+		# support = torch.sigmoid(support * support_w) * support
+		support_W_init = torch.cat([support_lb_emb, support, support_w], dim=-1)    # B, N*K, D_
+
 		# support_W_init = support_W_init.unsqueeze(1).expand(-1, total_Q, -1, -1).contiguous().view(B*total_Q, N*K, -1)  # B, total_Q, N*K, D_
-		query_W_init = torch.cat([query_lb_emb, query_w, query], dim=-1)  # B, total_Q, D_
+		query_W_init = torch.cat([query_lb_emb, query, query_w], dim=-1)  # B, total_Q, D_
 		# query_W_init = query_W_init.contiguous().view(B*total_Q, 1, -1)  # B*total_Q, 1, D_
 
 		w = torch.cat([support_W_init, query_W_init], dim=1)  # B, N*K + total_Q, Dlb
@@ -297,31 +301,49 @@ class MetaWGNN(fewshot_re_kit.framework.FewShotREModel):
 		w = self.gnn_obj(w)  # (B, N*K+total_Q, D)
 		w_q = w[:, N * K:]
 		w = w[:, :N * K]
-
 		w = w.contiguous().view(-1, K, D)  # B*N, K, D
 		proto = w.mean(1)  # prototype  B*N, D
 
 		# intra class inconsistency
-		proto_norm = F.normalize(proto, dim=-1, p=2)
-		w_norm = F.normalize(w, dim=-1, p=2)
-		intra_incon = - torch.sum(proto_norm.unsqueeze(1) * w_norm, dim=2) + 1
-		intra_incon = intra_incon.mean()
+		if K > 1:
+			proto_norm = F.normalize(proto, dim=-1, p=2)
+			w_norm = F.normalize(w, dim=-1, p=2)
+			# intra_incon = 1.0 - torch.sum(proto_norm.unsqueeze(1) * w_norm, dim=2)
+			# intra_incon = intra_incon.mean()
 
-		# intra_incon = torch.sum((proto.unsqueeze(1) * w), 2)
-		# intra_incon = 1 - (intra_incon / (torch.norm(proto.unsqueeze(1), dim=-1) * torch.norm(w, dim=-1)))
-		# intra_incon = intra_incon.mean()
+			# intra_dist = - torch.sum(proto_norm.unsqueeze(1) * w_norm, dim=2) + 1.0  # B*N, K
 
-		# inter class consistency
-		# proto_norm = proto_norm.view(B, N, D)
-		# inter_con = torch.matmul(proto_norm, proto_norm.transpose(-1, -2))  # B, N, N
-		# inter_con = inter_con.triu(diagonal=1)
-		# inter_con = inter_con.clamp(0).sum() / torch.ones_like(inter_con).triu(diagonal=1).sum()
-		J = intra_incon #+ inter_con
+			# inter class consistency
+			proto_norm = proto_norm.view(B, N, D)
+			w_norm = w_norm.view(B, N*K, D)
+			dists = - torch.matmul(proto_norm, w_norm.transpose(-1, -2)) + 1.0  # B, N, N*K
+			# print(dists.max())
+			dists = dists.view(B, N, N, K)
+			mask = torch.eye(N, device=dists.device).bool()
+			intra_dists = dists.masked_select(mask[None, :, :, None]).view(B, N*K)  # pos
+			inter_dists = dists.masked_select(~mask[None, :, :, None]).view(B, N*(N-1)*K)  # neg
+
+			dist_map = torch.clamp(intra_dists[:, :, None]**2 - inter_dists[:, None, :]**2 + 0.5, 0)
+
+
+			J = dist_map.mean()
+			# print(J)
+			# inter_con = torch.matmul(proto_norm, proto_norm.transpose(-1, -2))  # B, N, N
+
+			# print(J)
+			# inter_con = inter_con.triu(diagonal=1)# - 0.5
+			# inter_con = inter_con.clamp(0).sum() / (B*N*(N-1)/2)
+			# print(inter_con.item())
+			# J = inter_con
+		else:
+			J = 0
 
 		proto = proto.view(-1, N, D).unsqueeze(1).expand(-1, total_Q, N, D)  # B, total_Q, N, D
 		w_q = w_q.contiguous().view(-1, total_Q, 1, D)
-		logits = torch.sum((w_q * proto), dim=3).view(-1, N)
-		# print(logits.shape)
+		if self.na_rate > 0:
+			proto = torch.cat([proto, query.unsqueeze(2)], dim=2)  # B, total_Q, N+1, D
+		logits = torch.sum((w_q * proto), dim=3).view(-1, proto.shape[2])
+
 		logits_meta[:, :logits.shape[1]] = (logits_meta[:, :logits.shape[1]] + logits) / 2
 		# logits = (logits + logits_meta) / 2
 		logits = logits_meta

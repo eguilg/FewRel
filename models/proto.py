@@ -36,13 +36,13 @@ class Proto(fewshot_re_kit.framework.FewShotREModel):
         query = query.view(-1, total_Q, self.hidden_size) # (B, total_Q, D)
 
         B = support.size(0) # Batch size
-         
-        # Prototypical Networks 
-        # Ignore NA policy
+
+        # Prototypical Networks
         support = torch.mean(support, 2) # Calculate prototype for each class
+        na = support.view(B, -1, self.hidden_size).mean(1, keepdim=True)
+        support = torch.cat([support, na], dim=1)  # B N+1, D
         logits = -self.__batch_dist__(support, query) # (B, total_Q, N)
-        minn, _ = logits.min(-1)
-        logits = torch.cat([logits, minn.unsqueeze(2) - 1], 2) # (B, total_Q, N + 1)
+        logits[:, :, -1] = -10
         _, pred = torch.max(logits.view(-1, N+1), 1)
         return logits, pred
 

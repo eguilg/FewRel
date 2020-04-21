@@ -3,6 +3,7 @@ from fewshot_re_kit.framework import FewShotREFramework
 from fewshot_re_kit.sentence_encoder import CNNSentenceEncoder, BERTSentenceEncoder, BERTPAIRSentenceEncoder, RobertaSentenceEncoder, RobertaPAIRSentenceEncoder, DummySentenceEncoder, ATTNSentenceEncoder
 import models
 from models.proto import Proto
+from models.proto_norm import ProtoNorm
 from models.proto_hatt import ProtoHATT
 from models.mlan import MLAN
 from models.poly import Poly
@@ -11,6 +12,7 @@ from models.wgnn import WGNN, MetaWGNN
 from models.gog import GOG
 from models.snail import SNAIL
 from models.metanet import MetaNet
+from models.maml import MAML
 from models.siamese import Siamese
 from models.pair import Pair
 from models.d import Discriminator
@@ -191,14 +193,14 @@ def main():
     elif model_name == 'wgnn':
         model = WGNN(sentence_encoder, N, na_rate=opt.na_rate)
     elif model_name == 'metawgnn':
-        model = MetaWGNN(sentence_encoder, N, na_rate=opt.na_rate)
+        model = MetaWGNN(sentence_encoder, N, na_rate=opt.na_rate, hidden_size=opt.hidden_size)
     elif model_name == 'gog':
         model = GOG(sentence_encoder, N)
     elif model_name == 'snail':
         print("HINT: SNAIL works only in PyTorch 0.3.1")
         model = SNAIL(sentence_encoder, N, K)
     elif model_name == 'metanet':
-        model = MetaNet(sentence_encoder.embedding, N, max_length)
+        model = MAML(sentence_encoder.embedding, N, max_length)
         encoder_p_num = sum(p.numel() for p in sentence_encoder.embedding.parameters())
     elif model_name == 'siamese':
         model = Siamese(sentence_encoder, hidden_size=opt.hidden_size, dropout=opt.dropout)

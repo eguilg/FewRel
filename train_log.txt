@@ -1,0 +1,259 @@
+10-way-5-shot Few-Shot Relation Classification
+model: metawgnn
+encoder: cnn
+max_length: 50
+<class 'fewshot_re_kit.sentence_encoder.CNNSentenceEncoder'>
+model param num: 2123600
+Start training...
+step: 1000 | loss: 1.813938, accuracy: 35.32%
+[EVAL] step: 1000 | accuracy: 65.03%
+Best checkpoint
+step: 2000 | loss: 0.467399, accuracy: 83.26%
+[EVAL] step: 1000 | accuracy: 72.04%
+Best checkpoint
+step: 3000 | loss: 0.301161, accuracy: 89.14%
+[EVAL] step: 1000 | accuracy: 72.84%
+Best checkpoint
+step: 4000 | loss: 0.235317, accuracy: 91.51%
+[EVAL] step: 1000 | accuracy: 72.21%
+step: 5000 | loss: 0.194637, accuracy: 93.01%
+[EVAL] step: 1000 | accuracy: 74.71%
+Best checkpoint
+step: 6000 | loss: 0.167881, accuracy: 93.97%
+[EVAL] step: 1000 | accuracy: 74.31%
+step: 7000 | loss: 0.146445, accuracy: 94.68%
+[EVAL] step: 1000 | accuracy: 74.34%
+step: 8000 | loss: 0.131629, accuracy: 95.26%
+[EVAL] step: 1000 | accuracy: 73.73%
+step: 9000 | loss: 0.118775, accuracy: 95.66%
+[EVAL] step: 1000 | accuracy: 75.27%
+Best checkpoint
+step: 10000 | loss: 0.112740, accuracy: 95.92%
+[EVAL] step: 1000 | accuracy: 75.85%
+Best checkpoint
+step: 11000 | loss: 0.101475, accuracy: 96.34%
+[EVAL] step: 1000 | accuracy: 76.01%
+Best checkpoint
+step: 12000 | loss: 0.092197, accuracy: 96.63%
+[EVAL] step: 1000 | accuracy: 75.74%
+step: 13000 | loss: 0.085493, accuracy: 96.94%
+[EVAL] step: 1000 | accuracy: 75.00%
+step: 14000 | loss: 0.080367, accuracy: 97.02%
+[EVAL] step: 1000 | accuracy: 76.26%
+Best checkpoint
+step: 15000 | loss: 0.074062, accuracy: 97.33%
+[EVAL] step: 1000 | accuracy: 76.21%
+step: 16000 | loss: 0.069747, accuracy: 97.48%%
+[EVAL] step: 1000 | accuracy: 76.58%
+Best checkpoint
+step: 17000 | loss: 0.061982, accuracy: 97.72%
+[EVAL] step: 1000 | accuracy: 74.88%
+step: 18000 | loss: 0.061455, accuracy: 97.77%
+[EVAL] step: 1000 | accuracy: 76.65%
+Best checkpoint
+step: 19000 | loss: 0.057413, accuracy: 97.94%
+[EVAL] step: 1000 | accuracy: 77.09%
+Best checkpoint
+step: 20000 | loss: 0.056194, accuracy: 97.98%
+[EVAL] step: 1000 | accuracy: 76.98%
+step: 21000 | loss: 0.044644, accuracy: 98.35%
+[EVAL] step: 1000 | accuracy: 77.74%
+Best checkpoint
+step: 22000 | loss: 0.040978, accuracy: 98.48%
+[EVAL] step: 1000 | accuracy: 77.85%
+Best checkpoint
+step: 23000 | loss: 0.038595, accuracy: 98.59%%
+[EVAL] step: 1000 | accuracy: 78.04%
+Best checkpoint
+step: 24000 | loss: 0.037387, accuracy: 98.69%
+[EVAL] step: 1000 | accuracy: 77.59%
+step: 25000 | loss: 0.036510, accuracy: 98.69%
+[EVAL] step: 1000 | accuracy: 78.08%
+Best checkpoint
+step: 26000 | loss: 0.034769, accuracy: 98.69%
+[EVAL] step: 1000 | accuracy: 77.59%
+step: 27000 | loss: 0.032213, accuracy: 98.81%%
+[EVAL] step: 1000 | accuracy: 77.78%
+step: 28000 | loss: 0.034634, accuracy: 98.71%
+[EVAL] step: 1000 | accuracy: 78.04%
+step: 29000 | loss: 0.035316, accuracy: 98.70%
+[EVAL] step: 1000 | accuracy: 78.00%
+step: 30000 | loss: 0.032025, accuracy: 98.83%
+[EVAL] step: 1000 | accuracy: 77.93%
+step: 31000 | loss: 0.031242, accuracy: 98.84%%
+[EVAL] step: 1000 | accuracy: 78.11%
+Best checkpoint
+step: 32000 | loss: 0.029327, accuracy: 98.92%%
+[EVAL] step: 1000 | accuracy: 77.74%
+step: 33000 | loss: 0.030394, accuracy: 98.91%%
+[EVAL] step: 1000 | accuracy: 78.15%
+Best checkpoint
+step: 34000 | loss: 0.029434, accuracy: 98.93%%
+[EVAL] step: 1000 | accuracy: 78.20%
+Best checkpoint
+step: 35000 | loss: 0.029310, accuracy: 98.91%%
+[EVAL] step: 1000 | accuracy: 78.12%
+step: 36000 | loss: 0.030051, accuracy: 98.93%
+[EVAL] step: 1000 | accuracy: 78.20%
+Best checkpoint
+step: 37000 | loss: 0.032081, accuracy: 98.81%
+[EVAL] step: 1000 | accuracy: 77.92%
+step: 38000 | loss: 0.028867, accuracy: 98.94%
+[EVAL] step: 1000 | accuracy: 78.13%
+step: 39000 | loss: 0.028092, accuracy: 98.98%
+[EVAL] step: 1000 | accuracy: 78.24%
+Best checkpoint
+step: 40000 | loss: 0.027503, accuracy: 99.00%%
+[EVAL] step: 1000 | accuracy: 78.20%
+step: 41000 | loss: 0.028561, accuracy: 98.98%
+[EVAL] step: 1000 | accuracy: 78.03%
+step: 42000 | loss: 0.028501, accuracy: 98.93%
+[EVAL] step: 1000 | accuracy: 78.12%
+step: 43000 | loss: 0.028059, accuracy: 98.95%%
+[EVAL] step: 1000 | accuracy: 77.95%
+step: 44000 | loss: 0.027838, accuracy: 98.95%%
+[EVAL] step: 1000 | accuracy: 77.90%
+step: 45000 | loss: 0.027631, accuracy: 99.00%%
+[EVAL] step: 1000 | accuracy: 77.94%
+step: 46000 | loss: 0.027901, accuracy: 98.98%
+[EVAL] step: 1000 | accuracy: 78.02%
+step: 47000 | loss: 0.027279, accuracy: 98.99%%
+[EVAL] step: 1000 | accuracy: 78.20%
+step: 48000 | loss: 0.026762, accuracy: 99.00%
+[EVAL] step: 1000 | accuracy: 78.28%
+Best checkpoint
+step: 49000 | loss: 0.027068, accuracy: 99.01%%
+[EVAL] step: 1000 | accuracy: 78.41%
+Best checkpoint
+step: 50000 | loss: 0.027520, accuracy: 98.98%%
+[EVAL] step: 1000 | accuracy: 78.22%
+
+############################################
+
+5-way-5-shot Few-Shot Relation Classification
+model: metawgnn
+encoder: cnn
+max_length: 50
+<class 'fewshot_re_kit.sentence_encoder.CNNSentenceEncoder'>
+model param num: 2122450
+Start training...
+step: 1000 | loss: 1.272557, accuracy: 47.03%
+[EVAL] step: 1000 | accuracy: 74.79%
+Best checkpoint
+step: 2000 | loss: 0.360350, accuracy: 85.99%
+[EVAL] step: 1000 | accuracy: 82.06%
+Best checkpoint
+step: 3000 | loss: 0.234826, accuracy: 90.91%
+[EVAL] step: 1000 | accuracy: 83.57%
+Best checkpoint
+step: 4000 | loss: 0.179170, accuracy: 93.03%
+[EVAL] step: 1000 | accuracy: 83.55%
+step: 5000 | loss: 0.152698, accuracy: 94.13%
+[EVAL] step: 1000 | accuracy: 84.73%
+Best checkpoint
+step: 6000 | loss: 0.134468, accuracy: 94.82%
+[EVAL] step: 1000 | accuracy: 84.33%
+step: 7000 | loss: 0.121627, accuracy: 95.32%
+[EVAL] step: 1000 | accuracy: 85.56%
+Best checkpoint
+step: 8000 | loss: 0.113018, accuracy: 95.85%
+[EVAL] step: 1000 | accuracy: 86.49%
+Best checkpoint
+step: 9000 | loss: 0.103689, accuracy: 96.11%
+[EVAL] step: 1000 | accuracy: 86.06%
+step: 10000 | loss: 0.091868, accuracy: 96.55%
+[EVAL] step: 1000 | accuracy: 86.07%
+step: 11000 | loss: 0.090699, accuracy: 96.56%%
+[EVAL] step: 1000 | accuracy: 85.95%
+step: 12000 | loss: 0.082451, accuracy: 96.88%
+[EVAL] step: 1000 | accuracy: 86.23%
+step: 13000 | loss: 0.079531, accuracy: 97.02%%
+[EVAL] step: 1000 | accuracy: 86.70%
+Best checkpoint
+step: 14000 | loss: 0.076582, accuracy: 97.11%%
+[EVAL] step: 1000 | accuracy: 86.19%
+step: 15000 | loss: 0.071431, accuracy: 97.38%
+[EVAL] step: 1000 | accuracy: 86.82%
+Best checkpoint
+step: 16000 | loss: 0.069426, accuracy: 97.48%
+[EVAL] step: 1000 | accuracy: 86.56%
+step: 17000 | loss: 0.068165, accuracy: 97.47%%
+[EVAL] step: 1000 | accuracy: 87.01%
+Best checkpoint
+step: 18000 | loss: 0.062217, accuracy: 97.68%
+[EVAL] step: 1000 | accuracy: 87.07%
+Best checkpoint
+step: 19000 | loss: 0.061654, accuracy: 97.66%
+[EVAL] step: 1000 | accuracy: 87.14%
+Best checkpoint
+step: 20000 | loss: 0.055929, accuracy: 97.90%
+[EVAL] step: 1000 | accuracy: 87.31%
+Best checkpoint
+step: 21000 | loss: 0.050992, accuracy: 98.04%
+[EVAL] step: 1000 | accuracy: 87.99%
+Best checkpoint
+step: 22000 | loss: 0.044366, accuracy: 98.40%
+[EVAL] step: 1000 | accuracy: 88.17%
+Best checkpoint
+step: 23000 | loss: 0.039972, accuracy: 98.54%
+[EVAL] step: 1000 | accuracy: 88.48%
+Best checkpoint
+step: 24000 | loss: 0.041090, accuracy: 98.45%%
+[EVAL] step: 1000 | accuracy: 88.36%
+step: 25000 | loss: 0.039997, accuracy: 98.47%
+[EVAL] step: 1000 | accuracy: 88.61%
+Best checkpoint
+step: 26000 | loss: 0.039199, accuracy: 98.53%
+[EVAL] step: 1000 | accuracy: 88.27%
+step: 27000 | loss: 0.039541, accuracy: 98.51%%
+[EVAL] step: 1000 | accuracy: 88.64%
+Best checkpoint
+step: 28000 | loss: 0.036435, accuracy: 98.64%%
+[EVAL] step: 1000 | accuracy: 88.29%
+step: 29000 | loss: 0.034334, accuracy: 98.79%%
+[EVAL] step: 1000 | accuracy: 88.89%
+Best checkpoint
+step: 30000 | loss: 0.036649, accuracy: 98.56%
+[EVAL] step: 1000 | accuracy: 88.33%
+step: 31000 | loss: 0.033621, accuracy: 98.69%
+[EVAL] step: 1000 | accuracy: 88.42%
+step: 32000 | loss: 0.033604, accuracy: 98.73%
+[EVAL] step: 1000 | accuracy: 88.88%
+step: 33000 | loss: 0.034093, accuracy: 98.72%%
+[EVAL] step: 1000 | accuracy: 88.72%
+step: 34000 | loss: 0.035248, accuracy: 98.69%
+[EVAL] step: 1000 | accuracy: 88.97%
+Best checkpoint
+step: 35000 | loss: 0.036946, accuracy: 98.64%%
+[EVAL] step: 1000 | accuracy: 88.93%
+step: 36000 | loss: 0.033650, accuracy: 98.73%%
+[EVAL] step: 1000 | accuracy: 88.96%
+step: 37000 | loss: 0.032173, accuracy: 98.84%%
+[EVAL] step: 1000 | accuracy: 88.69%
+step: 38000 | loss: 0.032130, accuracy: 98.77%
+[EVAL] step: 1000 | accuracy: 88.47%
+step: 39000 | loss: 0.033957, accuracy: 98.73%
+[EVAL] step: 1000 | accuracy: 88.89%
+step: 40000 | loss: 0.033007, accuracy: 98.79%%
+[EVAL] step: 1000 | accuracy: 88.96%
+step: 41000 | loss: 0.032008, accuracy: 98.74%%
+[EVAL] step: 1000 | accuracy: 88.77%
+step: 42000 | loss: 0.030465, accuracy: 98.83%%
+[EVAL] step: 1000 | accuracy: 88.84%
+step: 43000 | loss: 0.031602, accuracy: 98.82%%
+[EVAL] step: 1000 | accuracy: 89.02%
+Best checkpoint
+step: 44000 | loss: 0.034293, accuracy: 98.71%%
+[EVAL] step: 1000 | accuracy: 88.63%
+step: 45000 | loss: 0.033860, accuracy: 98.71%%
+[EVAL] step: 1000 | accuracy: 88.61%
+step: 46000 | loss: 0.030409, accuracy: 98.88%%
+[EVAL] step: 1000 | accuracy: 88.83%
+step: 47000 | loss: 0.031226, accuracy: 98.88%
+[EVAL] step: 1000 | accuracy: 88.94%
+step: 48000 | loss: 0.030984, accuracy: 98.84%
+[EVAL] step: 1000 | accuracy: 88.70%
+step: 49000 | loss: 0.031675, accuracy: 98.80%%
+[EVAL] step: 1000 | accuracy: 88.68%
+step: 50000 | loss: 0.032442, accuracy: 98.79%%
+[EVAL] step: 1000 | accuracy: 88.59%

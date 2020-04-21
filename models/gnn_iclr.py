@@ -211,11 +211,32 @@ class GNN_nl(nn.Module):
 
         for i in range(self.num_layers):
             Wi = self._modules['layer_w{}'.format(i)](x, W_init)
-
+            # point_prod = torch.matmul(x, x.transpose(-1, -2))
+            # eye = torch.eye(point_prod.shape[-1], device=point_prod.device).unsqueeze(0)
+            # point_prod = point_prod + eye * -10000
+            # point_prod = torch.softmax(point_prod, dim=-1)
+            # div = F.kl_div((Wi[:, :, :, 1]+1e-6).log(), point_prod)
+            # print(torch.abs(Wi[:,:,:,1]-point_prod).mean().item(), i)
+            # if self.training:
+            #     with open('log.txt', 'a') as fp:
+            #         fp.write('{}\n'.format(div.item()))
+            # print(div.item(), i)
+            # Wi[:, :, :, 1] = point_prod
+            # Wi = torch.stack([W_init.squeeze(-1), Wi], -1)
             x_new = F.leaky_relu(self._modules['layer_l{}'.format(i)]([Wi, x])[1])
             x = torch.cat([x, x_new], 2)
 
-        Wl=self.w_comp_last(x, W_init)
+        Wl = self.w_comp_last(x, W_init)
+        # point_prod = torch.matmul(x, x.transpose(-1, -2))
+        # eye = torch.eye(point_prod.shape[-1], device=point_prod.device).unsqueeze(0)
+        # point_prod = point_prod + eye * -10000
+        # point_prod = torch.softmax(point_prod, dim=-1)
+        # div = F.kl_div((Wl[:, :, :, 1] + 1e-6).log(), point_prod)
+        # if self.training:
+        #     with open('log.txt', 'a') as fp:
+        #         fp.write('{}\n'.format(div.item()))
+        # print(div.item(), self.num_layers)
+        # Wl = torch.stack([W_init.squeeze(-1), Wl], -1)
         out = self.layer_last([Wl, x])[1]
 
         return out[:, 0, :]
